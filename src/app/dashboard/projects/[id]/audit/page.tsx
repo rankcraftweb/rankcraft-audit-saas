@@ -1,80 +1,33 @@
-"use client";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import AuditRunner from "./audit-runner";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+type AuditPageProps = {
+  params: Promise<{
+    id: string;
+  }>;
+};
 
-export default function AuditPage() {
-  const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<any>(null);
+export default async function AuditPage({ params }: AuditPageProps) {
+  const { id } = await params;
 
-  async function runAudit() {
-    setLoading(true);
+  const supabase = await createClient();
 
-    const response = await fetch("/api/pagespeed", {
-      method: "POST",
-      body: JSON.stringify({
-        url: "https://rankcraftweb.com",
-      }),
-    });
+  const { data: project, error } = await supabase
+    .from("projects")
+    .select("id, name, domain")
+    .eq("id", id)
+    .single();
 
-    const data = await response.json();
-    setReport(data);
-    setLoading(false);
+  if (error || !project) {
+    notFound();
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold">Site Audit</h2>
-        <p className="text-muted-foreground">
-          Run a technical SEO and performance scan.
-        </p>
-      </div>
-
-      <Button onClick={runAudit} disabled={loading}>
-        {loading ? "Running audit..." : "Run Audit"}
-      </Button>
-
-      {report && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{report.performance}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Accessibility</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{report.accessibility}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Best Practices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{report.bestPractices}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">SEO</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{report.seo}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </div>
+    <AuditRunner
+      projectId={project.id}
+      projectName={project.name}
+      projectDomain={project.domain}
+    />
   );
 }

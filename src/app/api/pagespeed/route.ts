@@ -5,13 +5,26 @@ export async function POST(request: Request) {
 
   if (!url) {
     return NextResponse.json(
-      { error: "URL is required" },
+      { error: "URL is required." },
       { status: 400 }
     );
   }
 
-  const apiUrl = new URL("https://www.googleapis.com/pagespeedonline/v5/runPagespeed");
+  const apiKey = process.env.PAGESPEED_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Missing PAGESPEED_API_KEY in .env.local." },
+      { status: 500 }
+    );
+  }
+
+  const apiUrl = new URL(
+    "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+  );
+
   apiUrl.searchParams.set("url", url);
+  apiUrl.searchParams.set("key", apiKey);
   apiUrl.searchParams.set("category", "performance");
   apiUrl.searchParams.append("category", "accessibility");
   apiUrl.searchParams.append("category", "best-practices");
@@ -22,8 +35,12 @@ export async function POST(request: Request) {
 
   if (!response.ok) {
     return NextResponse.json(
-      { error: data.error?.message || "PageSpeed request failed" },
-      { status: 500 }
+      {
+        error:
+          data.error?.message ||
+          "PageSpeed request failed. Please try again later.",
+      },
+      { status: response.status }
     );
   }
 

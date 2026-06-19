@@ -1,28 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function NewProjectPage() {
+  const supabase = createClient();
+
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   async function createProject() {
     setLoading(true);
+    setMessage("");
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setMessage("You must be logged in to create a project.");
+      setLoading(false);
+      return;
+    }
 
     const { error } = await supabase.from("projects").insert({
+      user_id: user.id,
       name,
       domain,
     });
 
-    setLoading(false);
-
     if (error) {
-      alert(error.message);
+      setMessage(error.message);
+      setLoading(false);
       return;
     }
 
@@ -34,7 +55,11 @@ export default function NewProjectPage() {
       <Card>
         <CardHeader>
           <CardTitle>Add Website Project</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Add a website you want to audit and monitor.
+          </p>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <Input
             placeholder="Project name"
@@ -47,6 +72,10 @@ export default function NewProjectPage() {
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
           />
+
+          {message && (
+            <p className="text-sm text-muted-foreground">{message}</p>
+          )}
 
           <Button onClick={createProject} disabled={loading}>
             {loading ? "Creating..." : "Create Project"}
