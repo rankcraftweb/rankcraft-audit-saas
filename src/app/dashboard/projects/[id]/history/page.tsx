@@ -141,6 +141,7 @@ export default async function AuditHistoryPage({ params }: HistoryPageProps) {
                   <TableHead>Status</TableHead>
                   <TableHead>SEO Score</TableHead>
                   <TableHead>Issues</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -159,6 +160,16 @@ export default async function AuditHistoryPage({ params }: HistoryPageProps) {
 
                     <TableCell>
                       {issueCountByAudit.get(audit.id) ?? 0}
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <Button asChild variant="outline" size="sm">
+                        <Link
+                          href={`/dashboard/projects/${project.id}/history/${audit.id}`}
+                        >
+                          View Issues
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
