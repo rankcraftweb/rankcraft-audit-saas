@@ -26,6 +26,30 @@ type PageSpeedReport = {
   error?: string;
 };
 
+type SeoIssue = {
+  title: string;
+  description: string;
+  severity: "low" | "medium" | "high";
+  category: "metadata" | "content" | "technical" | "images";
+  recommendation: string;
+};
+
+type SeoScanReport = {
+  url: string;
+  summary: {
+    title: string;
+    titleLength: number;
+    metaDescription: string;
+    metaDescriptionLength: number;
+    h1Count: number;
+    imageCount: number;
+    imagesMissingAlt: number;
+    canonical: string;
+  };
+  issues: SeoIssue[];
+  error?: string;
+};
+
 export default function AuditRunner({
   projectId,
   projectName,
@@ -34,15 +58,19 @@ export default function AuditRunner({
   const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<PageSpeedReport | null>(null);
+  const [pageSpeedReport, setPageSpeedReport] =
+    useState<PageSpeedReport | null>(null);
+  const [seoScanReport, setSeoScanReport] =
+    useState<SeoScanReport | null>(null);
   const [message, setMessage] = useState("");
 
   async function runAudit() {
     setLoading(true);
     setMessage("");
-    setReport(null);
+    setPageSpeedReport(null);
+    setSeoScanReport(null);
 
-    const response = await fetch("/api/pagespeed", {
+    const pageSpeedResponse = await fetch("/api/pagespeed", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -52,32 +80,93 @@ export default function AuditRunner({
       }),
     });
 
-    const data: PageSpeedReport = await response.json();
+    const pageSpeedData: PageSpeedReport =
+      await pageSpeedResponse.json();
 
-    if (!response.ok || data.error) {
-      setMessage(data.error || "Audit failed.");
+    if (!pageSpeedResponse.ok || pageSpeedData.error) {
+      setMessage(pageSpeedData.error || "PageSpeed audit failed.");
       setLoading(false);
       return;
     }
 
-    setReport(data);
+    setPageSpeedReport(pageSpeedData);
 
-    const { error } = await supabase.from("pagespeed_reports").insert({
-      project_id: projectId,
-      url: data.url,
-      performance_score: data.performance,
-      accessibility_score: data.accessibility,
-      best_practices_score: data.bestPractices,
-      seo_score: data.seo,
-      raw_json: data.raw,
-    });
+    const { error: pageSpeedSaveError } = await supabase
+      .from("pagespeed_reports")
+      .insert({
+        project_id: projectId,
+        url: pageSpeedData.url,
+        performance_score: pageSpeedData.performance,
+        accessibility_score: pageSpeedData.accessibility,
+        best_practices_score: pageSpeedData.bestPractices,
+        seo_score: pageSpeedData.seo,
+        raw_json: pageSpeedData.raw,
+      });
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage("Audit saved successfully.");
+    if (pageSpeedSaveError) {
+      setMessage(pageSpeedSaveError.message);
+      setLoading(false);
+      return;
     }
 
+    const seoScanResponse = await fetch("/api/seo-scan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: projectDomain,
+      }),
+    });
+
+    const seoScanData: SeoScanReport = await seoScanResponse.json();
+
+    if (!seoScanResponse.ok || seoScanData.error) {
+      setMessage(seoScanData.error || "SEO scan failed.");
+      setLoading(false);
+      return;
+    }
+
+    setSeoScanReport(seoScanData);
+
+    const { data: audit, error: auditError } = await supabase
+      .from("audits")
+      .insert({
+        project_id: projectId,
+        score: pageSpeedData.seo,
+        status: "completed",
+      })
+      .select("id")
+      .single();
+
+    if (auditError || !audit) {
+      setMessage(auditError?.message || "Could not save audit.");
+      setLoading(false);
+      return;
+    }
+
+    if (seoScanData.issues.length > 0) {
+      const issuesToInsert = seoScanData.issues.map((issue) => ({
+        audit_id: audit.id,
+        title: issue.title,
+        description: issue.description,
+        severity: issue.severity,
+        category: issue.category,
+        recommendation: issue.recommendation,
+      }));
+
+      const { error: issuesError } = await supabase
+        .from("audit_issues")
+        .insert(issuesToInsert);
+
+      if (issuesError) {
+        setMessage(issuesError.message);
+        setLoading(false);
+        return;
+      }
+    }
+
+    setMessage("Audit and SEO issues saved successfully.");
     setLoading(false);
   }
 
@@ -90,21 +179,23 @@ export default function AuditRunner({
       </div>
 
       <Button onClick={runAudit} disabled={loading}>
-        {loading ? "Running audit..." : "Run PageSpeed Audit"}
+        {loading ? "Running full audit..." : "Run Full SEO Audit"}
       </Button>
 
       {message && (
         <p className="text-sm text-muted-foreground">{message}</p>
       )}
 
-      {report && (
+      {pageSpeedReport && (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{report.performance}</p>
+              <p className="text-3xl font-bold">
+                {pageSpeedReport.performance}
+              </p>
             </CardContent>
           </Card>
 
@@ -113,7 +204,9 @@ export default function AuditRunner({
               <CardTitle className="text-sm">Accessibility</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{report.accessibility}</p>
+              <p className="text-3xl font-bold">
+                {pageSpeedReport.accessibility}
+              </p>
             </CardContent>
           </Card>
 
@@ -122,7 +215,9 @@ export default function AuditRunner({
               <CardTitle className="text-sm">Best Practices</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{report.bestPractices}</p>
+              <p className="text-3xl font-bold">
+                {pageSpeedReport.bestPractices}
+              </p>
             </CardContent>
           </Card>
 
@@ -131,9 +226,62 @@ export default function AuditRunner({
               <CardTitle className="text-sm">SEO</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{report.seo}</p>
+              <p className="text-3xl font-bold">{pageSpeedReport.seo}</p>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {seoScanReport && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-2xl font-bold">SEO Issues</h3>
+            <p className="text-muted-foreground">
+              {seoScanReport.issues.length} issue(s) found on this page.
+            </p>
+          </div>
+
+          {seoScanReport.issues.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No basic SEO issues found</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  This page passed the current metadata, heading, canonical,
+                  and image alt checks.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {seoScanReport.issues.map((issue) => (
+                <Card key={`${issue.title}-${issue.category}`}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between gap-4">
+                      <CardTitle className="text-lg">
+                        {issue.title}
+                      </CardTitle>
+
+                      <span className="rounded-full border px-3 py-1 text-xs capitalize">
+                        {issue.severity}
+                      </span>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {issue.description}
+                    </p>
+
+                    <p className="text-sm">
+                      <strong>Fix:</strong> {issue.recommendation}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

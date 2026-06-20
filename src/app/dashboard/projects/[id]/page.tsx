@@ -40,6 +40,21 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     .limit(1)
     .single();
 
+  const { data: latestAudit } = await supabase
+    .from("audits")
+    .select("id, created_at")
+    .eq("project_id", project.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const { count: issueCount } = latestAudit?.id
+    ? await supabase
+        .from("audit_issues")
+        .select("id", { count: "exact", head: true })
+        .eq("audit_id", latestAudit.id)
+    : { count: null };
+
   return (
     <div className="space-y-8">
       <div>
@@ -56,6 +71,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         </Button>
 
         <Button asChild variant="outline">
+          <Link href={`/dashboard/projects/${project.id}/history`}>
+            History
+          </Link>
+        </Button>
+
+        <Button asChild variant="outline">
           <Link href={`/dashboard/projects/${project.id}/keywords`}>
             Keywords
           </Link>
@@ -68,7 +89,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">SEO Score</CardTitle>
@@ -121,6 +142,20 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             </p>
             <p className="text-sm text-muted-foreground">
               Latest best practices score.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Issues</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-bold">
+              {issueCount ?? "--"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Latest detected SEO issues.
             </p>
           </CardContent>
         </Card>

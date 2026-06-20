@@ -24,6 +24,16 @@ type PageSpeedReport = {
   created_at: string;
 };
 
+type Audit = {
+  id: string;
+  project_id: string;
+  created_at: string;
+};
+
+type AuditIssue = {
+  audit_id: string;
+};
+
 export default async function ProjectsPage() {
   const supabase = await createClient();
 
@@ -45,13 +55,16 @@ export default async function ProjectsPage() {
 
   const projectIds = projects?.map((project: Project) => project.id) || [];
 
-  const { data: reports } = await supabase
-    .from("pagespeed_reports")
-    .select(
-      "project_id, performance_score, accessibility_score, best_practices_score, seo_score, created_at"
-    )
-    .in("project_id", projectIds)
-    .order("created_at", { ascending: false });
+  const { data: reports } =
+    projectIds.length > 0
+      ? await supabase
+          .from("pagespeed_reports")
+          .select(
+            "project_id, performance_score, accessibility_score, best_practices_score, seo_score, created_at"
+          )
+          .in("project_id", projectIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
   const latestReportByProject = new Map<string, PageSpeedReport>();
 
@@ -59,6 +72,42 @@ export default async function ProjectsPage() {
     if (!latestReportByProject.has(report.project_id)) {
       latestReportByProject.set(report.project_id, report);
     }
+  });
+
+  const { data: audits } =
+    projectIds.length > 0
+      ? await supabase
+          .from("audits")
+          .select("id, project_id, created_at")
+          .in("project_id", projectIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
+  const latestAuditByProject = new Map<string, string>();
+
+  audits?.forEach((audit: Audit) => {
+    if (!latestAuditByProject.has(audit.project_id)) {
+      latestAuditByProject.set(audit.project_id, audit.id);
+    }
+  });
+
+  const latestAuditIds = Array.from(latestAuditByProject.values());
+
+  const { data: auditIssues } =
+    latestAuditIds.length > 0
+      ? await supabase
+          .from("audit_issues")
+          .select("audit_id")
+          .in("audit_id", latestAuditIds)
+      : { data: [] };
+
+  const issueCountByAudit = new Map<string, number>();
+
+  auditIssues?.forEach((issue: AuditIssue) => {
+    issueCountByAudit.set(
+      issue.audit_id,
+      (issueCountByAudit.get(issue.audit_id) || 0) + 1
+    );
   });
 
   return (
@@ -97,6 +146,10 @@ export default async function ProjectsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {projects.map((project: Project) => {
             const latestReport = latestReportByProject.get(project.id);
+            const latestAuditId = latestAuditByProject.get(project.id);
+            const issueCount = latestAuditId
+              ? issueCountByAudit.get(latestAuditId) || 0
+              : null;
 
             return (
               <Card key={project.id}>
@@ -131,7 +184,9 @@ export default async function ProjectsPage() {
                       <p className="text-xs text-muted-foreground">
                         Issues
                       </p>
-                      <p className="text-2xl font-bold">--</p>
+                      <p className="text-2xl font-bold">
+                        {issueCount ?? "--"}
+                      </p>
                     </div>
                   </div>
 
@@ -149,7 +204,15 @@ export default async function ProjectsPage() {
                     </Button>
 
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/dashboard/projects/${project.id}/keywords`}>
+                      <Link href={`/dashboard/projects/${project.id}/history`}>
+                        History
+                      </Link>
+                    </Button>
+
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={`/dashboard/projects/${project.id}/keywords`}
+                      >
                         Keywords
                       </Link>
                     </Button>
