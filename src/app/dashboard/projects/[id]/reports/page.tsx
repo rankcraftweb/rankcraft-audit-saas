@@ -626,10 +626,6 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
               padding: 10px !important;
             }
 
-            .print-compact-card > div {
-              padding: 7px !important;
-            }
-
             .print-grid-4 {
               display: grid !important;
               grid-template-columns: repeat(4, 1fr) !important;
@@ -822,6 +818,12 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             <Button asChild variant="outline">
               <Link href={`/dashboard/projects/${project.id}/keywords`}>
                 Keywords
+              </Link>
+            </Button>
+
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${project.id}/recommendations`}>
+                Recommendations
               </Link>
             </Button>
           </div>
