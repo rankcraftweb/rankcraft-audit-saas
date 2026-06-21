@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,274 +16,416 @@ type AuditRunnerProps = {
   projectDomain: string;
 };
 
-type PageSpeedReport = {
-  url: string;
-  performance: number;
-  accessibility: number;
-  bestPractices: number;
-  seo: number;
-  raw: unknown;
-  error?: string;
-};
-
-type SeoIssue = {
-  title: string;
+type RunStep = {
+  label: string;
   description: string;
-  severity: "low" | "medium" | "high";
-  category: "metadata" | "content" | "technical" | "images";
-  recommendation: string;
+  status: "pending" | "running" | "done" | "error";
 };
 
-type SeoScanReport = {
-  url: string;
-  summary: {
-    title: string;
-    titleLength: number;
-    metaDescription: string;
-    metaDescriptionLength: number;
-    h1Count: number;
-    imageCount: number;
-    imagesMissingAlt: number;
-    canonical: string;
-  };
-  issues: SeoIssue[];
+type ApiResponse = {
+  success?: boolean;
+  error?: string;
+  message?: string;
+};
+
+type EndpointResult = {
+  ok: boolean;
+  endpoint: string;
+  data?: ApiResponse;
   error?: string;
 };
+
+function normalizeDomainForDisplay(domain: string) {
+  return domain
+    .replace("https://", "")
+    .replace("http://", "")
+    .replace(/\/$/, "");
+}
+
+function getStepClass(status: RunStep["status"]) {
+  if (status === "done") {
+    return "border-emerald-200 bg-emerald-50";
+  }
+
+  if (status === "running") {
+    return "border-slate-300 bg-slate-50";
+  }
+
+  if (status === "error") {
+    return "border-red-200 bg-red-50";
+  }
+
+  return "border-slate-200 bg-white";
+}
+
+function getDotClass(status: RunStep["status"]) {
+  if (status === "done") {
+    return "bg-emerald-500";
+  }
+
+  if (status === "running") {
+    return "bg-slate-950";
+  }
+
+  if (status === "error") {
+    return "bg-red-500";
+  }
+
+  return "bg-slate-300";
+}
+
+async function tryPostEndpoint(
+  endpoint: string,
+  payload: {
+    projectId: string;
+    url: string;
+    domain: string;
+    projectDomain: string;
+  }
+): Promise<EndpointResult> {
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.includes("application/json")) {
+      const text = await response.text();
+
+      return {
+        ok: false,
+        endpoint,
+        error: `Endpoint returned non-JSON response. Status: ${
+          response.status
+        }. Preview: ${text.slice(0, 80)}`,
+      };
+    }
+
+    const data: ApiResponse = await response.json();
+
+    if (!response.ok || data.error) {
+      return {
+        ok: false,
+        endpoint,
+        data,
+        error: data.error || data.message || `Request failed at ${endpoint}.`,
+      };
+    }
+
+    return {
+      ok: true,
+      endpoint,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      endpoint,
+      error:
+        error instanceof Error
+          ? error.message
+          : `Request failed at ${endpoint}.`,
+    };
+  }
+}
+
+async function postToFirstWorkingEndpoint(
+  endpoints: string[],
+  payload: {
+    projectId: string;
+    url: string;
+    domain: string;
+    projectDomain: string;
+  }
+) {
+  const errors: string[] = [];
+
+  for (const endpoint of endpoints) {
+    const result = await tryPostEndpoint(endpoint, payload);
+
+    if (result.ok) {
+      return result;
+    }
+
+    errors.push(`${result.endpoint}: ${result.error}`);
+  }
+
+  throw new Error(
+    `No working API endpoint found. Checked: ${endpoints.join(
+      ", "
+    )}. First error: ${errors[0] || "Unknown error"}`
+  );
+}
 
 export default function AuditRunner({
   projectId,
   projectName,
   projectDomain,
 }: AuditRunnerProps) {
-  const supabase = createClient();
+  const router = useRouter();
 
-  const [loading, setLoading] = useState(false);
-  const [pageSpeedReport, setPageSpeedReport] =
-    useState<PageSpeedReport | null>(null);
-  const [seoScanReport, setSeoScanReport] =
-    useState<SeoScanReport | null>(null);
-  const [message, setMessage] = useState("");
+  const [running, setRunning] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const [steps, setSteps] = useState<RunStep[]>([
+    {
+      label: "Prepare audit",
+      description: "Validate project and prepare scan request.",
+      status: "pending",
+    },
+    {
+      label: "Run SEO checks",
+      description: "Check metadata, title, description, and technical issues.",
+      status: "pending",
+    },
+    {
+      label: "Run PageSpeed scan",
+      description: "Fetch Lighthouse scores from Google PageSpeed Insights.",
+      status: "pending",
+    },
+    {
+      label: "Save results",
+      description: "Store audit history, issues, and performance scores.",
+      status: "pending",
+    },
+  ]);
+
+  function updateStep(index: number, status: RunStep["status"]) {
+    setSteps((currentSteps) =>
+      currentSteps.map((step, stepIndex) => {
+        if (stepIndex === index) {
+          return {
+            ...step,
+            status,
+          };
+        }
+
+        return step;
+      })
+    );
+  }
 
   async function runAudit() {
-    setLoading(true);
-    setMessage("");
-    setPageSpeedReport(null);
-    setSeoScanReport(null);
+    setRunning(true);
+    setSuccessMessage("");
+    setErrorMessage("");
 
-    const pageSpeedResponse = await fetch("/api/pagespeed", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    setSteps([
+      {
+        label: "Prepare audit",
+        description: "Validate project and prepare scan request.",
+        status: "running",
       },
-      body: JSON.stringify({
-        url: projectDomain,
-      }),
-    });
-
-    const pageSpeedData: PageSpeedReport =
-      await pageSpeedResponse.json();
-
-    if (!pageSpeedResponse.ok || pageSpeedData.error) {
-      setMessage(pageSpeedData.error || "PageSpeed audit failed.");
-      setLoading(false);
-      return;
-    }
-
-    setPageSpeedReport(pageSpeedData);
-
-    const { error: pageSpeedSaveError } = await supabase
-      .from("pagespeed_reports")
-      .insert({
-        project_id: projectId,
-        url: pageSpeedData.url,
-        performance_score: pageSpeedData.performance,
-        accessibility_score: pageSpeedData.accessibility,
-        best_practices_score: pageSpeedData.bestPractices,
-        seo_score: pageSpeedData.seo,
-        raw_json: pageSpeedData.raw,
-      });
-
-    if (pageSpeedSaveError) {
-      setMessage(pageSpeedSaveError.message);
-      setLoading(false);
-      return;
-    }
-
-    const seoScanResponse = await fetch("/api/seo-scan", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+      {
+        label: "Run SEO checks",
+        description: "Check metadata, title, description, and technical issues.",
+        status: "pending",
       },
-      body: JSON.stringify({
-        url: projectDomain,
-      }),
-    });
+      {
+        label: "Run PageSpeed scan",
+        description: "Fetch Lighthouse scores from Google PageSpeed Insights.",
+        status: "pending",
+      },
+      {
+        label: "Save results",
+        description: "Store audit history, issues, and performance scores.",
+        status: "pending",
+      },
+    ]);
 
-    const seoScanData: SeoScanReport = await seoScanResponse.json();
+    const payload = {
+      projectId,
+      url: projectDomain,
+      domain: projectDomain,
+      projectDomain,
+    };
 
-    if (!seoScanResponse.ok || seoScanData.error) {
-      setMessage(seoScanData.error || "SEO scan failed.");
-      setLoading(false);
-      return;
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      updateStep(0, "done");
+
+      updateStep(1, "running");
+
+      const seoAuditResult = await postToFirstWorkingEndpoint(
+        ["/api/audit", "/api/audits", "/api/audit/run", "/api/run-audit"],
+        payload
+      );
+
+      updateStep(1, "done");
+
+      updateStep(2, "running");
+
+      const pageSpeedResult = await postToFirstWorkingEndpoint(
+        [
+          "/api/pagespeed",
+          "/api/page-speed",
+          "/api/pagespeed/run",
+          "/api/pagespeed/audit",
+        ],
+        payload
+      );
+
+      updateStep(2, "done");
+
+      updateStep(3, "running");
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      updateStep(3, "done");
+
+      setSuccessMessage(
+        `Audit completed successfully. SEO endpoint: ${seoAuditResult.endpoint}. PageSpeed endpoint: ${pageSpeedResult.endpoint}.`
+      );
+
+      router.refresh();
+    } catch (error) {
+      setSteps((currentSteps) =>
+        currentSteps.map((step) => {
+          if (step.status === "running") {
+            return {
+              ...step,
+              status: "error",
+            };
+          }
+
+          return step;
+        })
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while running the audit."
+      );
+    } finally {
+      setRunning(false);
     }
-
-    setSeoScanReport(seoScanData);
-
-    const { data: audit, error: auditError } = await supabase
-      .from("audits")
-      .insert({
-        project_id: projectId,
-        score: pageSpeedData.seo,
-        status: "completed",
-      })
-      .select("id")
-      .single();
-
-    if (auditError || !audit) {
-      setMessage(auditError?.message || "Could not save audit.");
-      setLoading(false);
-      return;
-    }
-
-    if (seoScanData.issues.length > 0) {
-      const issuesToInsert = seoScanData.issues.map((issue) => ({
-        audit_id: audit.id,
-        title: issue.title,
-        description: issue.description,
-        severity: issue.severity,
-        category: issue.category,
-        recommendation: issue.recommendation,
-      }));
-
-      const { error: issuesError } = await supabase
-        .from("audit_issues")
-        .insert(issuesToInsert);
-
-      if (issuesError) {
-        setMessage(issuesError.message);
-        setLoading(false);
-        return;
-      }
-    }
-
-    setMessage("Audit and SEO issues saved successfully.");
-    setLoading(false);
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-sm text-muted-foreground">Site Audit</p>
-        <h2 className="text-3xl font-bold">{projectName}</h2>
-        <p className="text-muted-foreground">{projectDomain}</p>
-      </div>
-
-      <Button onClick={runAudit} disabled={loading}>
-        {loading ? "Running full audit..." : "Run Full SEO Audit"}
-      </Button>
-
-      {message && (
-        <p className="text-sm text-muted-foreground">{message}</p>
-      )}
-
-      {pageSpeedReport && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">
-                {pageSpeedReport.performance}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Accessibility</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">
-                {pageSpeedReport.accessibility}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Best Practices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">
-                {pageSpeedReport.bestPractices}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">SEO</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{pageSpeedReport.seo}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {seoScanReport && (
-        <div className="space-y-4">
+    <Card className="rounded-2xl border-slate-200 shadow-sm">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-bold">SEO Issues</h3>
-            <p className="text-muted-foreground">
-              {seoScanReport.issues.length} issue(s) found on this page.
+            <CardTitle>Run Audit</CardTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              Start a fresh scan for {projectName}.
             </p>
           </div>
 
-          {seoScanReport.issues.length === 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>No basic SEO issues found</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  This page passed the current metadata, heading, canonical,
-                  and image alt checks.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {seoScanReport.issues.map((issue) => (
-                <Card key={`${issue.title}-${issue.category}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between gap-4">
-                      <CardTitle className="text-lg">
-                        {issue.title}
-                      </CardTitle>
-
-                      <span className="rounded-full border px-3 py-1 text-xs capitalize">
-                        {issue.severity}
-                      </span>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      {issue.description}
-                    </p>
-
-                    <p className="text-sm">
-                      <strong>Fix:</strong> {issue.recommendation}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+            {normalizeDomainForDisplay(projectDomain)}
+          </span>
         </div>
-      )}
-    </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-slate-950">
+                Full technical SEO scan
+              </p>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+                This will refresh the project SEO audit, detect issues, fetch
+                PageSpeed scores, and update the report data.
+              </p>
+            </div>
+
+            <Button
+              onClick={runAudit}
+              disabled={running}
+              className="rounded-xl"
+            >
+              {running ? "Running audit..." : "Run Full Audit"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          {steps.map((step, index) => (
+            <div
+              key={step.label}
+              className={`rounded-2xl border p-4 transition ${getStepClass(
+                step.status
+              )}`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-1 h-2.5 w-2.5 rounded-full ${getDotClass(
+                    step.status
+                  )}`}
+                />
+
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-slate-950">
+                      {index + 1}. {step.label}
+                    </p>
+
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium capitalize text-slate-600">
+                      {step.status}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {step.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {successMessage && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="font-medium text-emerald-900">Audit complete</p>
+            <p className="mt-1 text-sm text-emerald-700">
+              {successMessage}
+            </p>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+            <p className="font-medium text-red-900">Audit failed</p>
+            <p className="mt-1 text-sm text-red-700">{errorMessage}</p>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="text-sm font-medium text-slate-950">
+              SEO Issues
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Finds metadata and on-page SEO gaps.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="text-sm font-medium text-slate-950">
+              PageSpeed
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Pulls real Lighthouse performance data.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="text-sm font-medium text-slate-950">
+              Reports
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Updates client-ready report output.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
