@@ -34,6 +34,16 @@ type AuditIssue = {
   created_at: string;
 };
 
+type Keyword = {
+  id: string;
+  query: string;
+  clicks: number | null;
+  impressions: number | null;
+  ctr: number | null;
+  position: number | null;
+  date: string | null;
+};
+
 function getScoreStatus(score: number | null | undefined) {
   if (score === null || score === undefined) {
     return "Not scanned yet";
@@ -69,12 +79,158 @@ function getOverallSummary(
   return "The website needs attention. Key technical and on-page SEO issues should be resolved before scaling content or campaigns.";
 }
 
+function getKeywordIntent(query: string) {
+  const lowerQuery = query.toLowerCase();
+
+  if (
+    lowerQuery.includes("near me") ||
+    lowerQuery.includes("services") ||
+    lowerQuery.includes("consultant") ||
+    lowerQuery.includes("designer") ||
+    lowerQuery.includes("developer")
+  ) {
+    return "Commercial";
+  }
+
+  if (
+    lowerQuery.includes("how") ||
+    lowerQuery.includes("what") ||
+    lowerQuery.includes("guide") ||
+    lowerQuery.includes("tips")
+  ) {
+    return "Informational";
+  }
+
+  if (
+    lowerQuery.includes("rankcraft") ||
+    lowerQuery.includes("rank craft") ||
+    lowerQuery.includes("rankcraftweb")
+  ) {
+    return "Brand";
+  }
+
+  return "General";
+}
+
+function getKeywordStatus(keyword: Keyword) {
+  const impressions = keyword.impressions || 0;
+  const clicks = keyword.clicks || 0;
+  const ctr = keyword.ctr || 0;
+  const position = Number(keyword.position || 0);
+
+  if (position > 0 && position <= 3) {
+    return "Top 3";
+  }
+
+  if (position > 3 && position <= 10) {
+    return "Page 1";
+  }
+
+  if (position > 10 && position <= 20) {
+    return "Near Page 1";
+  }
+
+  if (impressions >= 5 && clicks === 0) {
+    return "Low CTR";
+  }
+
+  if (ctr < 0.02 && impressions >= 5) {
+    return "CTR Gap";
+  }
+
+  return "Monitor";
+}
+
+function getOpportunityReason(keyword: Keyword) {
+  const impressions = keyword.impressions || 0;
+  const clicks = keyword.clicks || 0;
+  const ctr = keyword.ctr || 0;
+  const position = Number(keyword.position || 0);
+
+  if (position > 3 && position <= 10) {
+    return "Already ranking on page 1. Improve title, meta description, and content match to win more clicks.";
+  }
+
+  if (position > 10 && position <= 20) {
+    return "Close to page 1. Add supporting content, internal links, and improve page relevance.";
+  }
+
+  if (impressions >= 5 && clicks === 0) {
+    return "Getting search visibility but no clicks. Improve title and meta description to increase CTR.";
+  }
+
+  if (ctr < 0.02 && impressions >= 5) {
+    return "Low CTR compared to impressions. Improve SERP copy and strengthen keyword intent match.";
+  }
+
+  return "Keep monitoring this keyword as more Search Console data comes in.";
+}
+
+function getOpportunityScore(keyword: Keyword) {
+  const impressions = keyword.impressions || 0;
+  const clicks = keyword.clicks || 0;
+  const ctr = keyword.ctr || 0;
+  const position = Number(keyword.position || 100);
+
+  let score = 0;
+
+  if (position > 3 && position <= 10) {
+    score += 40;
+  }
+
+  if (position > 10 && position <= 20) {
+    score += 35;
+  }
+
+  if (impressions >= 10) {
+    score += 25;
+  } else if (impressions >= 5) {
+    score += 15;
+  } else if (impressions > 0) {
+    score += 5;
+  }
+
+  if (clicks === 0 && impressions > 0) {
+    score += 20;
+  }
+
+  if (ctr < 0.02 && impressions >= 5) {
+    score += 15;
+  }
+
+  return score;
+}
+
 function formatDate(date: string | null | undefined) {
   if (!date) {
     return "No date available";
   }
 
   return new Date(date).toLocaleString();
+}
+
+function formatShortDate(date: string | null | undefined) {
+  if (!date) {
+    return "--";
+  }
+
+  return new Date(date).toLocaleDateString();
+}
+
+function formatCtr(ctr: number | null | undefined) {
+  if (ctr === null || ctr === undefined) {
+    return "--";
+  }
+
+  return `${(Number(ctr) * 100).toFixed(2)}%`;
+}
+
+function formatPosition(position: number | null | undefined) {
+  if (position === null || position === undefined) {
+    return "--";
+  }
+
+  return Number(position).toFixed(1);
 }
 
 export default async function ReportsPage({ params }: ReportsPageProps) {
@@ -120,6 +276,14 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         .order("created_at", { ascending: true })
     : { data: [] };
 
+  const { data: keywords } = await supabase
+    .from("keywords")
+    .select("id, query, clicks, impressions, ctr, position, date")
+    .eq("project_id", project.id)
+    .order("impressions", { ascending: false });
+
+  const keywordList = keywords || [];
+
   const issueCount = issues?.length || 0;
 
   const highIssues =
@@ -138,9 +302,70 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
   const accessibilityScore = latestPageSpeedReport?.accessibility_score;
   const bestPracticesScore = latestPageSpeedReport?.best_practices_score;
 
+  const totalClicks = keywordList.reduce((sum: number, keyword: Keyword) => {
+    return sum + (keyword.clicks || 0);
+  }, 0);
+
+  const totalImpressions = keywordList.reduce(
+    (sum: number, keyword: Keyword) => {
+      return sum + (keyword.impressions || 0);
+    },
+    0
+  );
+
+  const averagePosition =
+    keywordList.length > 0
+      ? keywordList.reduce((sum: number, keyword: Keyword) => {
+          return sum + Number(keyword.position || 0);
+        }, 0) / keywordList.length
+      : null;
+
+  const averageCtr =
+    totalImpressions > 0 ? totalClicks / totalImpressions : null;
+
+  const pageOneKeywords = keywordList.filter((keyword: Keyword) => {
+    const position = Number(keyword.position || 0);
+    return position > 0 && position <= 10;
+  });
+
+  const nearPageOneKeywords = keywordList.filter((keyword: Keyword) => {
+    const position = Number(keyword.position || 0);
+    return position > 10 && position <= 20;
+  });
+
+  const lowCtrKeywords = keywordList.filter((keyword: Keyword) => {
+    const impressions = keyword.impressions || 0;
+    const clicks = keyword.clicks || 0;
+    const ctr = keyword.ctr || 0;
+
+    return impressions >= 5 && (clicks === 0 || ctr < 0.02);
+  });
+
+  const topOpportunities = [...keywordList]
+    .map((keyword: Keyword) => ({
+      ...keyword,
+      opportunityScore: getOpportunityScore(keyword),
+      intent: getKeywordIntent(keyword.query),
+      status: getKeywordStatus(keyword),
+      reason: getOpportunityReason(keyword),
+    }))
+    .filter((keyword) => keyword.opportunityScore > 0)
+    .sort((a, b) => b.opportunityScore - a.opportunityScore)
+    .slice(0, 5);
+
+  const topKeywords = [...keywordList]
+    .sort((a: Keyword, b: Keyword) => {
+      return (b.impressions || 0) - (a.impressions || 0);
+    })
+    .slice(0, 10);
+
   const reportDate = new Date().toLocaleString();
   const latestScanDate =
     latestAudit?.created_at || latestPageSpeedReport?.created_at;
+
+  const latestKeywordDate = keywordList[0]?.date
+    ? new Date(keywordList[0].date).toLocaleDateString()
+    : "No keyword data yet";
 
   return (
     <div className="space-y-8">
@@ -156,7 +381,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             body {
               background: white !important;
               color: black !important;
-              font-size: 10px !important;
+              font-size: 9px !important;
             }
 
             aside,
@@ -176,8 +401,8 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             }
 
             .print-hero {
-              padding: 14px !important;
-              margin-bottom: 10px !important;
+              padding: 12px !important;
+              margin-bottom: 8px !important;
               border: 1px solid #ddd !important;
               border-radius: 10px !important;
             }
@@ -191,30 +416,36 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             }
 
             .print-compact-card > div {
-              padding: 10px !important;
+              padding: 8px !important;
             }
 
             .print-grid-4 {
               display: grid !important;
               grid-template-columns: repeat(4, 1fr) !important;
-              gap: 8px !important;
+              gap: 6px !important;
+            }
+
+            .print-grid-3 {
+              display: grid !important;
+              grid-template-columns: repeat(3, 1fr) !important;
+              gap: 6px !important;
             }
 
             .print-grid-2 {
               display: grid !important;
               grid-template-columns: repeat(2, 1fr) !important;
-              gap: 8px !important;
+              gap: 6px !important;
             }
 
             .print-section {
-              margin-top: 10px !important;
+              margin-top: 8px !important;
               break-inside: auto !important;
               page-break-inside: auto !important;
             }
 
             .print-section-title {
-              font-size: 14px !important;
-              margin-bottom: 4px !important;
+              font-size: 13px !important;
+              margin-bottom: 3px !important;
             }
 
             .print-muted {
@@ -222,32 +453,32 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             }
 
             h1 {
-              font-size: 24px !important;
+              font-size: 22px !important;
               line-height: 1.1 !important;
             }
 
             h2 {
-              font-size: 20px !important;
+              font-size: 18px !important;
               line-height: 1.1 !important;
             }
 
             h3 {
-              font-size: 14px !important;
+              font-size: 13px !important;
               line-height: 1.1 !important;
             }
 
             p {
-              line-height: 1.35 !important;
+              line-height: 1.3 !important;
             }
 
             .print-score {
-              font-size: 24px !important;
+              font-size: 22px !important;
               line-height: 1 !important;
             }
 
             table {
               width: 100% !important;
-              font-size: 9px !important;
+              font-size: 8px !important;
               page-break-inside: auto;
               table-layout: fixed !important;
             }
@@ -260,7 +491,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             th,
             td {
               color: black !important;
-              padding: 5px !important;
+              padding: 4px !important;
               vertical-align: top !important;
               word-break: break-word !important;
               white-space: normal !important;
@@ -272,10 +503,10 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             }
 
             .print-footer {
-              margin-top: 10px !important;
-              padding-top: 8px !important;
+              margin-top: 8px !important;
+              padding-top: 6px !important;
               border-top: 1px solid #ddd !important;
-              font-size: 9px !important;
+              font-size: 8px !important;
             }
           }
         `}
@@ -307,6 +538,12 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             <Button asChild variant="outline">
               <Link href={`/dashboard/projects/${project.id}/history`}>
                 History
+              </Link>
+            </Button>
+
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${project.id}/keywords`}>
+                Keywords
               </Link>
             </Button>
           </div>
@@ -343,11 +580,18 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
 
                 <div className="flex justify-between gap-6">
                   <span className="text-muted-foreground print-muted">
-                    Latest Scan
+                    Latest Audit
                   </span>
                   <span className="font-medium">
                     {formatDate(latestScanDate)}
                   </span>
+                </div>
+
+                <div className="flex justify-between gap-6">
+                  <span className="text-muted-foreground print-muted">
+                    Keyword Data
+                  </span>
+                  <span className="font-medium">{latestKeywordDate}</span>
                 </div>
 
                 <div className="flex justify-between gap-6">
@@ -379,11 +623,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                 </p>
 
                 <p className="text-sm text-muted-foreground print-muted">
-                  Latest scan for{" "}
-                  <span className="font-medium text-foreground">
-                    {project.domain}
-                  </span>{" "}
-                  shows an SEO score of{" "}
+                  Latest audit shows an SEO score of{" "}
                   <span className="font-medium text-foreground">
                     {seoScore ?? "--"}
                   </span>{" "}
@@ -391,11 +631,15 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   <span className="font-medium text-foreground">
                     {issueCount}
                   </span>{" "}
-                  detected issue(s). Latest scan date:{" "}
+                  detected issue(s). Search Console currently shows{" "}
                   <span className="font-medium text-foreground">
-                    {formatDate(latestScanDate)}
-                  </span>
-                  .
+                    {totalImpressions}
+                  </span>{" "}
+                  impressions and{" "}
+                  <span className="font-medium text-foreground">
+                    {totalClicks}
+                  </span>{" "}
+                  clicks from imported keyword data.
                 </p>
               </>
             )}
@@ -474,6 +718,117 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         <section className="print-section space-y-4">
           <div>
             <h3 className="print-section-title text-2xl font-bold">
+              Keyword Visibility
+            </h3>
+            <p className="text-sm text-muted-foreground print-muted">
+              Imported from Google Search Console.
+            </p>
+          </div>
+
+          <div className="print-grid-4 grid gap-4 md:grid-cols-4">
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Clicks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">{totalClicks}</p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Imported range.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Impressions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">
+                  {totalImpressions}
+                </p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Search visibility.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Average CTR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">
+                  {formatCtr(averageCtr)}
+                </p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Click-through rate.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Avg. Position</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">
+                  {formatPosition(averagePosition)}
+                </p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Lower is better.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="print-grid-3 grid gap-4 md:grid-cols-3">
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Page 1 Keywords</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">
+                  {pageOneKeywords.length}
+                </p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Positions 1–10.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Near Page 1</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">
+                  {nearPageOneKeywords.length}
+                </p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Positions 11–20.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="print-compact-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Low CTR Keywords</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="print-score text-4xl font-bold">
+                  {lowCtrKeywords.length}
+                </p>
+                <p className="text-sm text-muted-foreground print-muted">
+                  Visibility with weak clicks.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="print-section space-y-4">
+          <div>
+            <h3 className="print-section-title text-2xl font-bold">
               Issue Summary
             </h3>
             <p className="text-sm text-muted-foreground print-muted">
@@ -540,28 +895,18 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
           </CardHeader>
 
           <CardContent>
-            {issueCount === 0 ? (
+            {issueCount === 0 && topOpportunities.length === 0 ? (
               <p className="text-sm text-muted-foreground print-muted">
-                No SEO issues were found in the latest scan. Continue monitoring
-                the website and rerun audits after major content or design
-                updates.
+                No major SEO issues or keyword opportunities were found in the
+                latest imported data. Continue monitoring the website and rerun
+                audits after major updates.
               </p>
             ) : (
               <div className="print-grid-2 grid gap-3 md:grid-cols-2">
-                {highIssues > 0 && (
-                  <div className="rounded-lg border p-3">
-                    <p className="font-medium">1. Fix high-priority issues</p>
-                    <p className="mt-1 text-sm text-muted-foreground print-muted">
-                      Resolve missing key SEO elements first, such as missing
-                      title tags, H1 headings, or crawl-related issues.
-                    </p>
-                  </div>
-                )}
-
                 {mediumIssues > 0 && (
                   <div className="rounded-lg border p-3">
                     <p className="font-medium">
-                      2. Improve metadata and structure
+                      1. Improve metadata and structure
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground print-muted">
                       Review page titles, descriptions, canonical tags, and
@@ -570,9 +915,31 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   </div>
                 )}
 
+                {topOpportunities.length > 0 && (
+                  <div className="rounded-lg border p-3">
+                    <p className="font-medium">
+                      2. Prioritize keyword opportunities
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground print-muted">
+                      Improve pages ranking near page 1 and update titles/meta
+                      descriptions for keywords with impressions but weak CTR.
+                    </p>
+                  </div>
+                )}
+
+                {highIssues > 0 && (
+                  <div className="rounded-lg border p-3">
+                    <p className="font-medium">3. Fix high-priority issues</p>
+                    <p className="mt-1 text-sm text-muted-foreground print-muted">
+                      Resolve missing key SEO elements first, such as title
+                      tags, H1 headings, or crawl-related issues.
+                    </p>
+                  </div>
+                )}
+
                 {lowIssues > 0 && (
                   <div className="rounded-lg border p-3">
-                    <p className="font-medium">3. Clean up minor SEO gaps</p>
+                    <p className="font-medium">4. Clean up minor SEO gaps</p>
                     <p className="mt-1 text-sm text-muted-foreground print-muted">
                       Address image alt text, minor length issues, and
                       lower-priority improvements.
@@ -580,6 +947,55 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   </div>
                 )}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="print-compact-card">
+          <CardHeader>
+            <CardTitle>Top Keyword Opportunities</CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            {topOpportunities.length === 0 ? (
+              <p className="text-sm text-muted-foreground print-muted">
+                No keyword opportunity data is available yet.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Keyword</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Impr.</TableHead>
+                    <TableHead>Clicks</TableHead>
+                    <TableHead>Pos.</TableHead>
+                    <TableHead>Recommended Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {topOpportunities.map((keyword) => (
+                    <TableRow key={keyword.id}>
+                      <TableCell className="font-medium">
+                        {keyword.query}
+                      </TableCell>
+
+                      <TableCell>{keyword.status}</TableCell>
+
+                      <TableCell>{keyword.impressions ?? 0}</TableCell>
+
+                      <TableCell>{keyword.clicks ?? 0}</TableCell>
+
+                      <TableCell>{formatPosition(keyword.position)}</TableCell>
+
+                      <TableCell className="text-sm text-muted-foreground print-muted">
+                        {keyword.reason}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -637,10 +1053,61 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
           </CardContent>
         </Card>
 
+        <Card className="print-compact-card">
+          <CardHeader>
+            <CardTitle>Top Keywords by Impressions</CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            {topKeywords.length === 0 ? (
+              <p className="text-sm text-muted-foreground print-muted">
+                No keyword data imported yet.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Keyword</TableHead>
+                    <TableHead>Intent</TableHead>
+                    <TableHead>Clicks</TableHead>
+                    <TableHead>Impr.</TableHead>
+                    <TableHead>CTR</TableHead>
+                    <TableHead>Pos.</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {topKeywords.map((keyword: Keyword) => (
+                    <TableRow key={keyword.id}>
+                      <TableCell className="font-medium">
+                        {keyword.query}
+                      </TableCell>
+
+                      <TableCell>{getKeywordIntent(keyword.query)}</TableCell>
+
+                      <TableCell>{keyword.clicks ?? 0}</TableCell>
+
+                      <TableCell>{keyword.impressions ?? 0}</TableCell>
+
+                      <TableCell>{formatCtr(keyword.ctr)}</TableCell>
+
+                      <TableCell>{formatPosition(keyword.position)}</TableCell>
+
+                      <TableCell>{formatShortDate(keyword.date)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
         <footer className="print-footer hidden print:block">
           <p className="text-xs text-muted-foreground print-muted">
             Generated by RankCraft Audit for {project.domain}. This report is
-            based on the latest available audit data at the time of generation.
+            based on the latest available audit and Google Search Console data
+            at the time of generation.
           </p>
         </footer>
       </div>
