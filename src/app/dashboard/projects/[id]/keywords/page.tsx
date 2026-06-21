@@ -454,6 +454,12 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
             </Link>
           </Button>
 
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/projects/${project.id}/recommendations`}>
+              Recommendations
+            </Link>
+          </Button>
+
           <Button asChild>
             <Link href={`/dashboard/projects/${project.id}/audit`}>
               Run Audit
@@ -535,6 +541,12 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
               <Button asChild>
                 <Link href={`/dashboard/projects/${project.id}/audit`}>
                   Run Audit
+                </Link>
+              </Button>
+
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/projects/${project.id}/recommendations`}>
+                  Recommendations
                 </Link>
               </Button>
 
