@@ -45,6 +45,18 @@ type KeywordRecommendation = GscKeywordRow & {
   opportunityScore: number;
 };
 
+function getSeverityLabel(severity: string | null | undefined) {
+  if (severity === "high") {
+    return "High";
+  }
+
+  if (severity === "medium") {
+    return "Medium";
+  }
+
+  return "Low";
+}
+
 function getSeverityClass(severity: string | null | undefined) {
   if (severity === "high") {
     return "border-rose-200 bg-rose-50 text-rose-700";
@@ -68,6 +80,30 @@ function getPriorityClass(priority: string) {
 
   if (priority === "Opportunity") {
     return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function getCategoryClass(category: string | null | undefined) {
+  if (category === "technical") {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  if (category === "metadata") {
+    return "border-purple-200 bg-purple-50 text-purple-700";
+  }
+
+  if (category === "content") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (category === "mobile") {
+    return "border-cyan-200 bg-cyan-50 text-cyan-700";
+  }
+
+  if (category === "accessibility") {
+    return "border-indigo-200 bg-indigo-50 text-indigo-700";
   }
 
   return "border-slate-200 bg-slate-50 text-slate-600";
@@ -186,7 +222,7 @@ function getKeywordAction(keyword: GscKeywordRow) {
   const position = Number(keyword.position || 0);
 
   if (position > 3 && position <= 15) {
-    return "Optimize the target page with stronger headings, better content depth, and more internal links. This keyword is close enough to improve.";
+    return "Optimize the ranking page with stronger headings, deeper content, and more internal links. This keyword is already close enough to move.";
   }
 
   if (impressions >= 10 && clicks === 0) {
@@ -194,11 +230,11 @@ function getKeywordAction(keyword: GscKeywordRow) {
   }
 
   if (ctr < 0.02 && impressions >= 10) {
-    return "Improve the search snippet and match the page more closely to the keyword intent to increase CTR.";
+    return "Improve the search snippet so the page matches the keyword intent better and earns more clicks from impressions.";
   }
 
   if (position > 15 && position <= 50) {
-    return "Build stronger page relevance with supporting content, internal links, and clearer keyword targeting.";
+    return "Build stronger page relevance with supporting content, better internal links, and clearer keyword targeting.";
   }
 
   if (position > 0 && position <= 3) {
@@ -304,6 +340,29 @@ function formatShortDate(date: string | null | undefined) {
   return new Date(date).toLocaleDateString();
 }
 
+function formatDate(date: string | null | undefined) {
+  if (!date) {
+    return "No audit yet";
+  }
+
+  return new Date(date).toLocaleString();
+}
+
+function sortIssuesByPriority(issues: AuditIssue[]) {
+  const severityOrder: Record<string, number> = {
+    high: 1,
+    medium: 2,
+    low: 3,
+  };
+
+  return [...issues].sort((a, b) => {
+    return (
+      (severityOrder[a.severity || "low"] || 3) -
+      (severityOrder[b.severity || "low"] || 3)
+    );
+  });
+}
+
 export default async function RecommendationsPage({
   params,
 }: RecommendationsPageProps) {
@@ -369,18 +428,7 @@ export default async function RecommendationsPage({
     .sort((a, b) => b.opportunityScore - a.opportunityScore)
     .slice(0, 8);
 
-  const topIssues = [...issueList].sort((a, b) => {
-    const severityOrder: Record<string, number> = {
-      high: 1,
-      medium: 2,
-      low: 3,
-    };
-
-    return (
-      (severityOrder[a.severity || "low"] || 3) -
-      (severityOrder[b.severity || "low"] || 3)
-    );
-  });
+  const topIssues = sortIssuesByPriority(issueList);
 
   const latestKeywordRange = getLatestKeywordRange(allKeywordRows);
   const latestKeywordDate = latestKeywordRange
@@ -388,6 +436,14 @@ export default async function RecommendationsPage({
         latestKeywordRange.endDate
       )}`
     : "No keyword data yet";
+
+  const totalClicks = keywordList.reduce((sum, keyword) => {
+    return sum + Number(keyword.clicks || 0);
+  }, 0);
+
+  const totalImpressions = keywordList.reduce((sum, keyword) => {
+    return sum + Number(keyword.impressions || 0);
+  }, 0);
 
   const hasAnyData = issueList.length > 0 || keywordRecommendations.length > 0;
 
@@ -431,25 +487,38 @@ export default async function RecommendationsPage({
 
       <section className="overflow-hidden rounded-[2rem] border bg-white shadow-sm">
         <div className="relative p-8">
-          <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-rose-100 blur-3xl" />
-          <div className="absolute right-28 top-10 h-36 w-36 rounded-full bg-blue-100 blur-3xl" />
+          <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-rose-100 blur-3xl" />
+          <div className="absolute right-32 top-10 h-40 w-40 rounded-full bg-blue-100 blur-3xl" />
+          <div className="absolute bottom-0 left-1/2 h-36 w-36 rounded-full bg-emerald-100 blur-3xl" />
 
           <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                   {project.domain}
                 </p>
-                <h1 className="mt-2 text-4xl font-bold tracking-tight">
-                  What should be fixed next?
+                <h1 className="mt-2 max-w-3xl text-4xl font-bold tracking-tight">
+                  Fix the highest-impact SEO items first.
                 </h1>
               </div>
 
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                This page turns audit issues and Google Search Console keyword
-                data into a clear action plan. Start with high-priority blockers,
-                then improve keywords with visibility and ranking potential.
+                This page turns the latest audit issues and Google Search Console
+                keyword data into a focused action plan. Start with blockers,
+                then improve keywords that already have visibility.
               </p>
+
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
+                  {highIssues.length} high priority
+                </span>
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                  {mediumIssues.length} medium priority
+                </span>
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                  {keywordRecommendations.length} keyword actions
+                </span>
+              </div>
             </div>
 
             <Card className="border-slate-200 bg-background/90 shadow-sm">
@@ -469,6 +538,13 @@ export default async function RecommendationsPage({
                   <span className="text-muted-foreground">Audit Status</span>
                   <span className="font-medium capitalize">
                     {latestAudit?.status || "No audit yet"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-6">
+                  <span className="text-muted-foreground">Latest Audit</span>
+                  <span className="font-medium">
+                    {formatDate(latestAudit?.created_at)}
                   </span>
                 </div>
 
@@ -497,16 +573,16 @@ export default async function RecommendationsPage({
             className: "border-amber-200 bg-amber-50",
           },
           {
-            label: "Low Priority",
-            value: lowIssues.length,
-            helper: "Improve later",
-            className: "border-slate-200 bg-slate-50",
-          },
-          {
             label: "Keyword Actions",
             value: keywordRecommendations.length,
             helper: "GSC opportunities",
             className: "border-blue-200 bg-blue-50",
+          },
+          {
+            label: "Search Visibility",
+            value: formatNumber(totalImpressions),
+            helper: `${formatNumber(totalClicks)} clicks`,
+            className: "border-emerald-200 bg-emerald-50",
           },
         ].map((item) => (
           <Card key={item.label} className={`shadow-sm ${item.className}`}>
@@ -535,8 +611,8 @@ export default async function RecommendationsPage({
             </h3>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Recommendations will appear after the project has audit issues,
-              PageSpeed data, or Google Search Console keyword rows.
+              Recommendations will appear after the project has audit issues or
+              Google Search Console keyword rows.
             </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -564,40 +640,60 @@ export default async function RecommendationsPage({
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <p className="text-sm font-semibold">
-                    1. Fix SEO blockers first
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-sm font-bold text-rose-700">
+                      1
+                    </span>
+                    <p className="text-sm font-semibold">
+                      Fix SEO blockers first
+                    </p>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
                     Start with high and medium audit issues because they can
                     affect crawlability, metadata quality, and page relevance.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <p className="text-sm font-semibold">
-                    2. Improve close-ranking keywords
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Focus on keywords in positions 4–15. These are usually the
-                    fastest opportunities to move with better content and links.
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700">
+                      2
+                    </span>
+                    <p className="text-sm font-semibold">
+                      Improve close-ranking keywords
+                    </p>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    Focus on keywords in positions 4–15 because these are
+                    usually the fastest opportunities to move.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <p className="text-sm font-semibold">
-                    3. Rewrite weak snippets
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 text-sm font-bold text-amber-700">
+                      3
+                    </span>
+                    <p className="text-sm font-semibold">
+                      Rewrite weak snippets
+                    </p>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
                     For keywords with impressions but low clicks, improve the
                     title tag and meta description to increase CTR.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <p className="text-sm font-semibold">
-                    4. Rerun audit after updates
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm font-bold text-emerald-700">
+                      4
+                    </span>
+                    <p className="text-sm font-semibold">
+                      Rerun audit after updates
+                    </p>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
                     After applying fixes, run another audit and compare keyword
                     movement in the next Search Console sync.
                   </p>
@@ -608,14 +704,30 @@ export default async function RecommendationsPage({
 
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>SEO Issue Recommendations</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle>SEO Issue Recommendations</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Audit findings sorted by severity.
+                  </p>
+                </div>
+
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/dashboard/projects/${project.id}/audit`}>
+                    Run New Audit
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
 
             <CardContent>
               {topIssues.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No SEO issues found in the latest audit.
-                </p>
+                <div className="rounded-2xl border border-dashed bg-slate-50 p-8 text-center">
+                  <p className="text-sm font-medium">No SEO issues found.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    The latest audit did not return issue recommendations.
+                  </p>
+                </div>
               ) : (
                 <div className="grid gap-3">
                   {topIssues.map((issue) => (
@@ -623,8 +735,8 @@ export default async function RecommendationsPage({
                       key={issue.id}
                       className="rounded-2xl border bg-white p-5 shadow-sm"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="max-w-3xl">
                           <h3 className="text-base font-semibold">
                             {issue.title}
                           </h3>
@@ -636,14 +748,18 @@ export default async function RecommendationsPage({
 
                         <div className="flex flex-wrap gap-2">
                           <span
-                            className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${getSeverityClass(
+                            className={`rounded-full border px-3 py-1 text-xs font-medium ${getSeverityClass(
                               issue.severity
                             )}`}
                           >
-                            {issue.severity || "medium"}
+                            {getSeverityLabel(issue.severity)}
                           </span>
 
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium capitalize text-slate-600">
+                          <span
+                            className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${getCategoryClass(
+                              issue.category
+                            )}`}
+                          >
                             {issue.category || "general"}
                           </span>
                         </div>
@@ -668,14 +784,32 @@ export default async function RecommendationsPage({
 
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Keyword Recommendations</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Keyword Recommendations</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Opportunities from the latest Google Search Console sync.
+                  </p>
+                </div>
+
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/dashboard/projects/${project.id}/keywords`}>
+                    View Keywords
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
 
             <CardContent>
               {keywordRecommendations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No keyword recommendations found in the latest synced data.
-                </p>
+                <div className="rounded-2xl border border-dashed bg-slate-50 p-8 text-center">
+                  <p className="text-sm font-medium">
+                    No keyword recommendations found.
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Sync Google Search Console data or wait for more impressions.
+                  </p>
+                </div>
               ) : (
                 <div className="grid gap-3">
                   {keywordRecommendations.map((keyword) => (
@@ -683,8 +817,8 @@ export default async function RecommendationsPage({
                       key={keyword.id}
                       className="rounded-2xl border bg-white p-5 shadow-sm"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="max-w-3xl">
                           <h3 className="text-base font-semibold">
                             {keyword.query}
                           </h3>
@@ -717,7 +851,7 @@ export default async function RecommendationsPage({
                         </div>
                       </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded-xl bg-slate-50 p-3">
                           <p className="text-xs text-muted-foreground">
                             Impressions
