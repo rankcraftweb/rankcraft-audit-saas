@@ -71,7 +71,7 @@ function formatDate(date: string | null | undefined) {
     return "--";
   }
 
-  return new Date(date).toLocaleString();
+  return new Date(date).toLocaleDateString();
 }
 
 function getScoreLabel(score: number | null | undefined) {
@@ -84,26 +84,33 @@ function getScoreLabel(score: number | null | undefined) {
   }
 
   if (score >= 70) {
-    return "Needs improvement";
+    return "Needs work";
   }
 
-  return "Needs attention";
+  return "Attention";
 }
 
 function getScoreBadgeClass(score: number | null | undefined) {
   if (score === null || score === undefined) {
-    return "border-slate-200 bg-slate-50 text-slate-600";
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
 
   if (score >= 90) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (score >= 70) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   return "border-red-200 bg-red-50 text-red-700";
+}
+
+function normalizeDomainForDisplay(domain: string) {
+  return domain
+    .replace("https://", "")
+    .replace("http://", "")
+    .replace(/\/$/, "");
 }
 
 export default async function DashboardPage() {
@@ -116,11 +123,9 @@ export default async function DashboardPage() {
 
   if (projectsError) {
     return (
-      <div>
-        <h2 className="text-3xl font-bold">Dashboard</h2>
-        <p className="mt-4 text-sm text-red-500">
-          {projectsError.message}
-        </p>
+      <div className="space-y-3">
+        <h2 className="text-2xl font-bold text-slate-950">Dashboard</h2>
+        <p className="text-sm text-red-600">{projectsError.message}</p>
       </div>
     );
   }
@@ -225,50 +230,39 @@ export default async function DashboardPage() {
   const recentAudits = audits?.slice(0, 5) || [];
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-8 text-white shadow-sm">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-          <div className="space-y-5">
-            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80">
-              Technical SEO SaaS Dashboard
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
+              Technical SEO Dashboard
             </div>
 
-            <div className="space-y-3">
-              <h1 className="max-w-3xl text-4xl font-bold tracking-tight md:text-5xl">
-                Monitor SEO health, keyword visibility, and client reports.
+            <div>
+              <h1 className="max-w-2xl text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
+                Monitor SEO health and keyword visibility.
               </h1>
 
-              <p className="max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-                RankCraft Audit combines technical scans, PageSpeed data,
-                Search Console keywords, and report-ready insights in one
-                professional dashboard.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                Track project audits, PageSpeed scores, Google Search Console
+                visibility, and client-ready reports in one workspace.
               </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button asChild className="rounded-xl bg-white text-slate-950 hover:bg-slate-100">
-                <Link href="/dashboard/projects">Open Projects</Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/dashboard/projects/new">Add Website</Link>
-              </Button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-            <p className="text-sm text-slate-300">Average SEO Score</p>
-            <div className="mt-3 flex items-end justify-between gap-4">
-              <p className="text-6xl font-bold">
-                {formatScore(averageSeoScore)}
-              </p>
+          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] p-4 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
+                  Average SEO Score
+                </p>
+                <p className="mt-2 text-4xl font-bold tracking-tight text-white">
+                  {formatScore(averageSeoScore)}
+                </p>
+              </div>
 
               <span
-                className={`rounded-full border px-3 py-1 text-xs font-medium ${getScoreBadgeClass(
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreBadgeClass(
                   averageSeoScore
                 )}`}
               >
@@ -276,156 +270,138 @@ export default async function DashboardPage() {
               </span>
             </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-3 text-sm">
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Projects</p>
-                <p className="mt-1 text-xl font-semibold">{totalProjects}</p>
-              </div>
-
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Issues</p>
-                <p className="mt-1 text-xl font-semibold">{totalIssues}</p>
-              </div>
-
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Keywords</p>
-                <p className="mt-1 text-xl font-semibold">{totalKeywords}</p>
-              </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                {
+                  label: "Projects",
+                  value: totalProjects,
+                },
+                {
+                  label: "Issues",
+                  value: totalIssues,
+                },
+                {
+                  label: "Keywords",
+                  value: totalKeywords,
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-white/10 bg-white/10 p-3"
+                >
+                  <p className="text-[11px] text-slate-400">{item.label}</p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Projects
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {totalProjects}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Active website projects.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          {
+            label: "Projects",
+            value: totalProjects,
+            helper: "Active websites.",
+          },
+          {
+            label: "Avg. SEO Score",
+            value: formatScore(averageSeoScore),
+            helper: getScoreLabel(averageSeoScore),
+          },
+          {
+            label: "Open Issues",
+            value: totalIssues,
+            helper: "Detected issues.",
+          },
+          {
+            label: "Keywords",
+            value: totalKeywords,
+            helper: "Imported from GSC.",
+          },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {item.label}
+              </CardTitle>
+            </CardHeader>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Avg. SEO Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {formatScore(averageSeoScore)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(averageSeoScore)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Open Issues
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {totalIssues}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Total detected SEO issues.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Keywords
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {totalKeywords}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Imported from GSC.
-            </p>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <p className="text-3xl font-bold tracking-tight text-slate-950">
+                {item.value}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              GSC Clicks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {formatNumber(totalClicks)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              From imported keyword data.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 md:grid-cols-3">
+        {[
+          {
+            label: "GSC Clicks",
+            value: formatNumber(totalClicks),
+            helper: "From imported keywords.",
+          },
+          {
+            label: "GSC Impressions",
+            value: formatNumber(totalImpressions),
+            helper: "Search visibility.",
+          },
+          {
+            label: "Latest Audit",
+            value: latestAudit?.score ?? "--",
+            helper: latestProjectForAudit
+              ? latestProjectForAudit.name
+              : "No audit yet",
+          },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {item.label}
+              </CardTitle>
+            </CardHeader>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              GSC Impressions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {formatNumber(totalImpressions)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Search result visibility.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Latest Audit
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {latestAudit?.score ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {latestProjectForAudit
-                ? latestProjectForAudit.name
-                : "No audit yet"}
-            </p>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <p className="text-3xl font-bold tracking-tight text-slate-950">
+                {item.value}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <CardTitle>Recent Projects</CardTitle>
+                <CardTitle className="text-base text-slate-950">
+                  Recent Projects
+                </CardTitle>
                 <p className="mt-1 text-sm text-slate-500">
                   Latest websites being monitored.
                 </p>
               </div>
 
-              <Button asChild variant="outline" size="sm" className="rounded-xl">
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl border-[#e6dcc8] bg-white px-3 text-xs text-slate-700 hover:bg-[#faf7ef]"
+              >
                 <Link href="/dashboard/projects">View All</Link>
               </Button>
             </div>
@@ -433,21 +409,17 @@ export default async function DashboardPage() {
 
           <CardContent>
             {recentProjects.length === 0 ? (
-              <div className="space-y-4 rounded-2xl border border-dashed border-slate-300 p-6">
+              <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
                 <p className="text-sm text-slate-500">
-                  No projects yet. Create your first project to start running
-                  audits and tracking keyword visibility.
+                  No projects yet. Create your first project from the header to
+                  start running audits and tracking keyword visibility.
                 </p>
-
-                <Button asChild className="rounded-xl">
-                  <Link href="/dashboard/projects/new">Create Project</Link>
-                </Button>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-hidden rounded-2xl border border-[#e6dcc8]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50">
+                    <TableRow className="bg-[#faf7ef]">
                       <TableHead>Project</TableHead>
                       <TableHead>SEO</TableHead>
                       <TableHead>Perf.</TableHead>
@@ -473,15 +445,15 @@ export default async function DashboardPage() {
                               <p className="font-medium text-slate-950">
                                 {project.name}
                               </p>
-                              <p className="text-sm text-slate-500">
-                                {project.domain}
+                              <p className="text-xs text-slate-500">
+                                {normalizeDomainForDisplay(project.domain)}
                               </p>
                             </div>
                           </TableCell>
 
                           <TableCell>
                             <span
-                              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getScoreBadgeClass(
+                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getScoreBadgeClass(
                                 latestReport?.seo_score
                               )}`}
                             >
@@ -496,8 +468,15 @@ export default async function DashboardPage() {
                           <TableCell>{issueCount ?? "--"}</TableCell>
 
                           <TableCell className="text-right">
-                            <Button asChild variant="outline" size="sm">
-                              <Link href={`/dashboard/projects/${project.id}`}>
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-xl border-[#e6dcc8] bg-white px-3 text-xs hover:bg-[#faf7ef]"
+                            >
+                              <Link
+                                href={`/dashboard/projects/${project.id}`}
+                              >
                                 View
                               </Link>
                             </Button>
@@ -512,29 +491,31 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
             <div>
-              <CardTitle>Recent Audit Activity</CardTitle>
+              <CardTitle className="text-base text-slate-950">
+                Recent Audit Activity
+              </CardTitle>
               <p className="mt-1 text-sm text-slate-500">
-                Latest completed SEO scans.
+                Latest saved SEO scans.
               </p>
             </div>
           </CardHeader>
 
           <CardContent>
             {recentAudits.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-6">
+              <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
                 <p className="text-sm text-slate-500">
-                  No audit activity yet. Run a full SEO audit from a project
-                  page.
+                  No audit activity yet. Open a project and run a full SEO
+                  audit.
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-hidden rounded-2xl border border-[#e6dcc8]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50">
+                    <TableRow className="bg-[#faf7ef]">
                       <TableHead>Project</TableHead>
                       <TableHead>Score</TableHead>
                       <TableHead>Status</TableHead>
@@ -553,8 +534,8 @@ export default async function DashboardPage() {
                           <TableCell>
                             {project ? (
                               <Link
-                                href={`/dashboard/projects/${project.id}/history/${audit.id}`}
-                                className="font-medium text-slate-950 hover:underline"
+                                href={`/dashboard/projects/${project.id}/history`}
+                                className="font-medium text-slate-950 hover:text-[#9a7a19]"
                               >
                                 {project.name}
                               </Link>
@@ -565,7 +546,7 @@ export default async function DashboardPage() {
 
                           <TableCell>
                             <span
-                              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getScoreBadgeClass(
+                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getScoreBadgeClass(
                                 audit.score
                               )}`}
                             >
