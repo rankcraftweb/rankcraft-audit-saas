@@ -13,19 +13,19 @@ const mainNavItems = [
   {
     label: "Overview",
     href: "/dashboard",
-    description: "Main dashboard",
+    description: "Dashboard",
     exact: true,
   },
   {
     label: "Projects",
     href: "/dashboard/projects",
-    description: "Websites & audits",
+    description: "Websites",
     exact: false,
   },
   {
     label: "Billing",
     href: "/pricing",
-    description: "Plans & limits",
+    description: "Plans",
     exact: false,
   },
 ];
@@ -60,63 +60,65 @@ export default function DashboardSidebar({
         {
           label: "Project Overview",
           href: `/dashboard/projects/${projectId}`,
-          description: "Project summary",
+          description: "Summary",
           exact: true,
         },
         {
           label: "Run Audit",
           href: `/dashboard/projects/${projectId}/audit`,
-          description: "SEO and performance scan",
+          description: "Scan",
           exact: false,
         },
         {
           label: "Keywords",
           href: `/dashboard/projects/${projectId}/keywords`,
-          description: "Search Console data",
+          description: "GSC data",
           exact: false,
         },
         {
           label: "Reports",
           href: `/dashboard/projects/${projectId}/reports`,
-          description: "Client-ready report",
+          description: "Export",
           exact: false,
         },
         {
           label: "Recommendations",
           href: `/dashboard/projects/${projectId}/recommendations`,
-          description: "SEO action plan",
+          description: "Actions",
           exact: false,
         },
         {
           label: "History",
           href: `/dashboard/projects/${projectId}/history`,
-          description: "Previous audit runs",
+          description: "Past runs",
           exact: false,
         },
       ]
     : [];
 
   return (
-    <aside className="fixed left-0 top-0 z-30 hidden h-screen w-72 border-r border-slate-200 bg-white/95 p-5 shadow-sm backdrop-blur lg:block">
+    <aside className="fixed left-0 top-0 z-30 hidden h-screen w-64 border-r border-[#2b2413] bg-[#080808] p-4 text-white shadow-sm lg:block">
       <div className="flex h-full flex-col">
-        <Link href="/dashboard" className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white">
+        <Link href="/dashboard" className="mb-6 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#111111] text-xs font-bold text-[#d4af37]">
             RC
           </div>
 
-          <div>
-            <p className="text-lg font-bold tracking-tight">RankCraft Audit</p>
-            <p className="text-xs text-slate-500">SEO Intelligence SaaS</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold tracking-tight text-white">
+              RankCraft Audit
+            </p>
+            <p className="text-[11px] text-[#d4af37]">SEO Intelligence</p>
           </div>
         </Link>
 
-        <div className="space-y-7 overflow-y-auto pr-1">
+        <div className="space-y-5 overflow-y-auto pr-1">
           <nav>
-            <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#b6a46a]">
               Main
             </p>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               {mainNavItems.map((item) => {
                 const isActive = isActivePath(pathname, item.href, item.exact);
 
@@ -124,26 +126,28 @@ export default function DashboardSidebar({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`group block rounded-2xl border px-4 py-3 transition ${
+                    className={`group flex items-center justify-between rounded-xl border px-3 py-2.5 transition ${
                       isActive
-                        ? "border-slate-900 bg-slate-950 text-white shadow-sm"
-                        : "border-transparent text-slate-900 hover:border-slate-200 hover:bg-slate-50"
+                        ? "border-[#d4af37]/50 bg-[#d4af37] text-black shadow-sm"
+                        : "border-transparent text-slate-300 hover:border-[#d4af37]/30 hover:bg-[#141414] hover:text-white"
                     }`}
                   >
-                    <p
-                      className={`text-sm font-medium ${
-                        isActive ? "text-white" : "text-slate-900"
-                      }`}
-                    >
-                      {item.label}
-                    </p>
-                    <p
-                      className={`text-xs ${
-                        isActive ? "text-slate-300" : "text-slate-500"
-                      }`}
-                    >
-                      {item.description}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-semibold">
+                        {item.label}
+                      </p>
+                      <p
+                        className={`truncate text-[11px] ${
+                          isActive ? "text-black/70" : "text-slate-500"
+                        }`}
+                      >
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {isActive ? (
+                      <span className="h-2 w-2 rounded-full bg-black" />
+                    ) : null}
                   </Link>
                 );
               })}
@@ -152,11 +156,11 @@ export default function DashboardSidebar({
 
           {projectId ? (
             <nav>
-              <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#b6a46a]">
                 Project Tools
               </p>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {projectTools.map((item) => {
                   const isActive = isActivePath(
                     pathname,
@@ -168,26 +172,28 @@ export default function DashboardSidebar({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`group block rounded-2xl border px-4 py-3 transition ${
+                      className={`group flex items-center justify-between rounded-xl border px-3 py-2.5 transition ${
                         isActive
-                          ? "border-slate-900 bg-slate-950 text-white shadow-sm"
-                          : "border-transparent text-slate-900 hover:border-slate-200 hover:bg-slate-50"
+                          ? "border-[#d4af37]/50 bg-[#d4af37] text-black shadow-sm"
+                          : "border-transparent text-slate-300 hover:border-[#d4af37]/30 hover:bg-[#141414] hover:text-white"
                       }`}
                     >
-                      <p
-                        className={`text-sm font-medium ${
-                          isActive ? "text-white" : "text-slate-900"
-                        }`}
-                      >
-                        {item.label}
-                      </p>
-                      <p
-                        className={`text-xs ${
-                          isActive ? "text-slate-300" : "text-slate-500"
-                        }`}
-                      >
-                        {item.description}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold">
+                          {item.label}
+                        </p>
+                        <p
+                          className={`truncate text-[11px] ${
+                            isActive ? "text-black/70" : "text-slate-500"
+                          }`}
+                        >
+                          {item.description}
+                        </p>
+                      </div>
+
+                      {isActive ? (
+                        <span className="h-2 w-2 rounded-full bg-black" />
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -195,38 +201,41 @@ export default function DashboardSidebar({
             </nav>
           ) : null}
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Current Focus
+          <div className="rounded-xl border border-[#2b2413] bg-[#111111] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#b6a46a]">
+              Focus
             </p>
-            <p className="mt-2 text-sm font-semibold text-slate-950">
-              Technical SEO Monitoring
+            <p className="mt-1 text-[13px] font-semibold text-white">
+              SEO Monitoring
             </p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Track audits, issues, keyword visibility, and client-ready reports
-              from one dashboard.
+            <p className="mt-1 text-[11px] leading-5 text-slate-400">
+              Track audits, keywords, issues, and reports in one workspace.
             </p>
           </div>
         </div>
 
-        <div className="mt-auto space-y-4 pt-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">
+        <div className="mt-auto space-y-3 pt-4">
+          <div className="rounded-xl border border-[#2b2413] bg-[#111111] p-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#d4af37]/40 bg-[#d4af37] text-xs font-bold text-black">
                 {userInitial}
               </div>
 
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-950">
+                <p className="truncate text-xs font-semibold text-white">
                   {email}
                 </p>
-                <p className="text-xs text-slate-500">Signed in</p>
+                <p className="text-[11px] text-slate-500">Signed in</p>
               </div>
             </div>
           </div>
 
           <form action="/auth/logout" method="post">
-            <Button className="w-full rounded-xl" variant="outline" type="submit">
+            <Button
+              className="h-9 w-full rounded-xl border-[#2b2413] bg-[#111111] text-xs text-slate-200 hover:border-[#d4af37]/40 hover:bg-[#171717] hover:text-white"
+              variant="outline"
+              type="submit"
+            >
               Log out
             </Button>
           </form>

@@ -79,9 +79,9 @@ export default function DashboardMobileNav() {
     : [];
 
   return (
-    <div className="border-b border-slate-200 bg-white lg:hidden">
-      <div className="space-y-2 px-3 py-2">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="border-b border-[#2b2413] bg-[#080808] lg:hidden">
+      <div className="space-y-1.5 px-3 py-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
           {mainNavItems.map((item) => {
             const isActive = isActivePath(pathname, item.href, item.exact);
 
@@ -89,10 +89,10 @@ export default function DashboardMobileNav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
                   isActive
-                    ? "border-slate-950 bg-slate-950 text-white"
-                    : "border-slate-200 bg-white text-slate-600"
+                    ? "border-[#d4af37] bg-[#d4af37] text-black"
+                    : "border-[#2b2413] bg-[#111111] text-slate-300"
                 }`}
               >
                 {item.label}
@@ -102,7 +102,7 @@ export default function DashboardMobileNav() {
         </div>
 
         {projectTools.length > 0 ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
             {projectTools.map((item) => {
               const isActive = isActivePath(pathname, item.href, item.exact);
 
@@ -110,10 +110,10 @@ export default function DashboardMobileNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
                     isActive
-                      ? "border-blue-700 bg-blue-50 text-blue-700"
-                      : "border-slate-200 bg-slate-50 text-slate-600"
+                      ? "border-[#d4af37] bg-[#d4af37] text-black"
+                      : "border-[#2b2413] bg-[#111111] text-slate-300"
                   }`}
                 >
                   {item.label}
