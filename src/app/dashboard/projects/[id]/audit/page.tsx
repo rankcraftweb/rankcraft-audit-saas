@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AuditRunner from "./audit-runner";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -91,7 +89,7 @@ export default async function AuditPage({ params }: AuditPageProps) {
     .eq("project_id", project.id)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const { data: latestAudit } = await supabase
     .from("audits")
@@ -99,7 +97,7 @@ export default async function AuditPage({ params }: AuditPageProps) {
     .eq("project_id", project.id)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const { data: issues } = latestAudit?.id
     ? await supabase
@@ -108,19 +106,19 @@ export default async function AuditPage({ params }: AuditPageProps) {
         .eq("audit_id", latestAudit.id)
     : { data: [] };
 
-  const issueList = issues || [];
+  const issueList = (issues || []) as AuditIssue[];
 
-  const highIssues = issueList.filter(
-    (issue: AuditIssue) => issue.severity === "high"
-  ).length;
+  const highIssues = issueList.filter((issue) => {
+    return issue.severity === "high";
+  }).length;
 
-  const mediumIssues = issueList.filter(
-    (issue: AuditIssue) => issue.severity === "medium"
-  ).length;
+  const mediumIssues = issueList.filter((issue) => {
+    return issue.severity === "medium";
+  }).length;
 
-  const lowIssues = issueList.filter(
-    (issue: AuditIssue) => issue.severity === "low"
-  ).length;
+  const lowIssues = issueList.filter((issue) => {
+    return issue.severity === "low";
+  }).length;
 
   const seoScore = latestPageSpeedReport?.seo_score ?? latestAudit?.score;
   const performanceScore = latestPageSpeedReport?.performance_score;
@@ -130,20 +128,20 @@ export default async function AuditPage({ params }: AuditPageProps) {
     latestAudit?.created_at || latestPageSpeedReport?.created_at || null;
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-sm md:p-8">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+    <div className="space-y-6 lg:space-y-8">
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm sm:p-6 md:p-8">
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div className="space-y-5">
-            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80">
+            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 sm:px-4 sm:py-2">
               SEO Audit Runner
             </div>
 
             <div className="space-y-3">
-              <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                 Run a fresh SEO audit.
               </h1>
 
-              <p className="text-base text-slate-300">
+              <p className="text-sm text-slate-300 sm:text-base">
                 {project.name} · {normalizeDomainForDisplay(project.domain)}
               </p>
 
@@ -152,44 +150,15 @@ export default async function AuditPage({ params }: AuditPageProps) {
                 on-page metadata gaps, and report-ready recommendations.
               </p>
             </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                asChild
-                className="rounded-xl bg-white text-slate-950 hover:bg-slate-100"
-              >
-                <Link href={`/dashboard/projects/${project.id}`}>
-                  Project Overview
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href={`/dashboard/projects/${project.id}/history`}>
-                  Audit History
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href={`/dashboard/projects/${project.id}/reports`}>
-                  Client Report
-                </Link>
-              </Button>
-            </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur sm:p-5">
             <p className="text-sm text-slate-300">Latest SEO Score</p>
 
             <div className="mt-3 flex items-end justify-between gap-4">
-              <p className="text-6xl font-bold">{seoScore ?? "--"}</p>
+              <p className="text-5xl font-bold sm:text-6xl">
+                {seoScore ?? "--"}
+              </p>
 
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-medium ${getScoreBadgeClass(
@@ -200,7 +169,7 @@ export default async function AuditPage({ params }: AuditPageProps) {
               </span>
             </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-3 text-sm">
+            <div className="mt-5 grid grid-cols-3 gap-2 text-sm sm:mt-6 sm:gap-3">
               <div className="rounded-xl bg-white/10 p-3">
                 <p className="text-slate-400">Issues</p>
                 <p className="mt-1 text-xl font-semibold">
@@ -226,7 +195,7 @@ export default async function AuditPage({ params }: AuditPageProps) {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-slate-600">
@@ -353,20 +322,6 @@ export default async function AuditPage({ params }: AuditPageProps) {
                 <p>• SEO score and technical issues</p>
                 <p>• Report-ready recommendations</p>
               </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" className="rounded-xl">
-                <Link href={`/dashboard/projects/${project.id}/history`}>
-                  View History
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline" className="rounded-xl">
-                <Link href={`/dashboard/projects/${project.id}/reports`}>
-                  View Report
-                </Link>
-              </Button>
             </div>
           </CardContent>
         </Card>
