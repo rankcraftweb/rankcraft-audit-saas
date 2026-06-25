@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -108,15 +106,15 @@ function getScoreLabel(score: number | null | undefined) {
 
 function getScoreBadgeClass(score: number | null | undefined) {
   if (score === null || score === undefined) {
-    return "border-slate-200 bg-slate-50 text-slate-600";
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
 
   if (score >= 90) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (score >= 70) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   return "border-red-200 bg-red-50 text-red-700";
@@ -128,14 +126,14 @@ function getSeverityBadgeClass(severity: string | null | undefined) {
   }
 
   if (severity === "medium") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (severity === "low") {
-    return "border-slate-200 bg-slate-50 text-slate-600";
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
 
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
 }
 
 function getKeywordStatus(keyword: Keyword) {
@@ -177,14 +175,14 @@ function getProjectHealthSummary(
   }
 
   if (seoScore >= 90 && issueCount <= 2 && keywordCount > 0) {
-    return "This project has a strong technical foundation with live keyword visibility data available.";
+    return "Strong technical foundation with active keyword visibility data.";
   }
 
   if (seoScore >= 70) {
-    return "This project has a solid foundation, but there are still SEO improvements and keyword opportunities to review.";
+    return "Solid foundation with SEO improvements and keyword opportunities to review.";
   }
 
-  return "This project needs technical SEO attention before scaling content, rankings, or client reporting.";
+  return "Needs technical SEO attention before scaling content, rankings, or reporting.";
 }
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
@@ -210,7 +208,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     .eq("project_id", project.id)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const { data: latestAudit } = await supabase
     .from("audits")
@@ -218,7 +216,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     .eq("project_id", project.id)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const { data: issues } = latestAudit?.id
     ? await supabase
@@ -236,8 +234,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     .eq("project_id", project.id)
     .order("impressions", { ascending: false });
 
-  const issueList = issues || [];
-  const keywordList = keywords || [];
+  const issueList = (issues || []) as AuditIssue[];
+  const keywordList = (keywords || []) as Keyword[];
 
   const seoScore = latestPageSpeedReport?.seo_score ?? latestAudit?.score;
   const performanceScore = latestPageSpeedReport?.performance_score;
@@ -247,50 +245,43 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const issueCount = issueList.length;
   const keywordCount = keywordList.length;
 
-  const highIssues = issueList.filter(
-    (issue: AuditIssue) => issue.severity === "high"
-  ).length;
+  const highIssues = issueList.filter((issue) => issue.severity === "high")
+    .length;
 
-  const mediumIssues = issueList.filter(
-    (issue: AuditIssue) => issue.severity === "medium"
-  ).length;
+  const mediumIssues = issueList.filter((issue) => issue.severity === "medium")
+    .length;
 
-  const lowIssues = issueList.filter(
-    (issue: AuditIssue) => issue.severity === "low"
-  ).length;
+  const lowIssues = issueList.filter((issue) => issue.severity === "low").length;
 
-  const totalClicks = keywordList.reduce((sum: number, keyword: Keyword) => {
+  const totalClicks = keywordList.reduce((sum, keyword) => {
     return sum + (keyword.clicks || 0);
   }, 0);
 
-  const totalImpressions = keywordList.reduce(
-    (sum: number, keyword: Keyword) => {
-      return sum + (keyword.impressions || 0);
-    },
-    0
-  );
+  const totalImpressions = keywordList.reduce((sum, keyword) => {
+    return sum + (keyword.impressions || 0);
+  }, 0);
 
   const averageCtr =
     totalImpressions > 0 ? totalClicks / totalImpressions : null;
 
   const averagePosition =
     keywordList.length > 0
-      ? keywordList.reduce((sum: number, keyword: Keyword) => {
+      ? keywordList.reduce((sum, keyword) => {
           return sum + Number(keyword.position || 0);
         }, 0) / keywordList.length
       : null;
 
-  const pageOneKeywords = keywordList.filter((keyword: Keyword) => {
+  const pageOneKeywords = keywordList.filter((keyword) => {
     const position = Number(keyword.position || 0);
     return position > 0 && position <= 10;
   });
 
-  const nearPageOneKeywords = keywordList.filter((keyword: Keyword) => {
+  const nearPageOneKeywords = keywordList.filter((keyword) => {
     const position = Number(keyword.position || 0);
     return position > 10 && position <= 20;
   });
 
-  const lowCtrKeywords = keywordList.filter((keyword: Keyword) => {
+  const lowCtrKeywords = keywordList.filter((keyword) => {
     const impressions = keyword.impressions || 0;
     const clicks = keyword.clicks || 0;
     const ctr = keyword.ctr || 0;
@@ -309,72 +300,42 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     latestAudit?.created_at || latestPageSpeedReport?.created_at || null;
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-sm md:p-8">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-          <div className="space-y-5">
-            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80">
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
               Project Overview
             </div>
 
-            <div className="space-y-3">
-              <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
                 {project.name}
               </h1>
 
-              <p className="text-base text-slate-300">
+              <p className="mt-1 text-sm font-medium text-slate-600">
                 {normalizeDomainForDisplay(project.domain)}
               </p>
 
-              <p className="max-w-2xl text-sm leading-6 text-slate-300">
-                {getProjectHealthSummary(
-                  seoScore,
-                  issueCount,
-                  keywordCount
-                )}
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                {getProjectHealthSummary(seoScore, issueCount, keywordCount)}
               </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                asChild
-                className="rounded-xl bg-white text-slate-950 hover:bg-slate-100"
-              >
-                <Link href={`/dashboard/projects/${project.id}/audit`}>
-                  Run Audit
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href={`/dashboard/projects/${project.id}/keywords`}>
-                  View Keywords
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href={`/dashboard/projects/${project.id}/reports`}>
-                  Open Report
-                </Link>
-              </Button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-            <p className="text-sm text-slate-300">SEO Score</p>
-
-            <div className="mt-3 flex items-end justify-between gap-4">
-              <p className="text-6xl font-bold">{seoScore ?? "--"}</p>
+          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] p-4 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
+                  SEO Score
+                </p>
+                <p className="mt-2 text-4xl font-bold tracking-tight text-white">
+                  {seoScore ?? "--"}
+                </p>
+              </div>
 
               <span
-                className={`rounded-full border px-3 py-1 text-xs font-medium ${getScoreBadgeClass(
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreBadgeClass(
                   seoScore
                 )}`}
               >
@@ -382,170 +343,128 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               </span>
             </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-3 text-sm">
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Issues</p>
-                <p className="mt-1 text-xl font-semibold">{issueCount}</p>
-              </div>
-
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Keywords</p>
-                <p className="mt-1 text-xl font-semibold">{keywordCount}</p>
-              </div>
-
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Clicks</p>
-                <p className="mt-1 text-xl font-semibold">
-                  {formatNumber(totalClicks)}
-                </p>
-              </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                {
+                  label: "Issues",
+                  value: issueCount,
+                },
+                {
+                  label: "Keywords",
+                  value: keywordCount,
+                },
+                {
+                  label: "Clicks",
+                  value: formatNumber(totalClicks),
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-white/10 bg-white/10 p-3"
+                >
+                  <p className="text-[11px] text-slate-400">{item.label}</p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              SEO Score
-            </CardTitle>
-          </CardHeader>
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          {
+            label: "SEO Score",
+            value: seoScore ?? "--",
+            helper: getScoreLabel(seoScore),
+          },
+          {
+            label: "Performance",
+            value: performanceScore ?? "--",
+            helper: getScoreLabel(performanceScore),
+          },
+          {
+            label: "Open Issues",
+            value: issueCount,
+            helper: `${highIssues} high · ${mediumIssues} medium · ${lowIssues} low`,
+          },
+          {
+            label: "Keywords",
+            value: keywordCount,
+            helper: "Imported from GSC.",
+          },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {item.label}
+              </CardTitle>
+            </CardHeader>
 
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {seoScore ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(seoScore)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Performance
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {performanceScore ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(performanceScore)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Issues
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">{issueCount}</p>
-            <p className="mt-1 text-sm text-slate-500">
-              {highIssues} high · {mediumIssues} medium · {lowIssues} low
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Keywords
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {keywordCount}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              GSC imported keywords.
-            </p>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <p className="text-3xl font-bold tracking-tight text-slate-950">
+                {item.value}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Impressions
-            </CardTitle>
-          </CardHeader>
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          {
+            label: "Impressions",
+            value: formatNumber(totalImpressions),
+            helper: "Search visibility.",
+          },
+          {
+            label: "Average CTR",
+            value: formatCtr(averageCtr),
+            helper: "Click-through rate.",
+          },
+          {
+            label: "Avg. Position",
+            value: formatPosition(averagePosition),
+            helper: "Lower is better.",
+          },
+          {
+            label: "Page 1 Keywords",
+            value: pageOneKeywords.length,
+            helper: "Positions 1–10.",
+          },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {item.label}
+              </CardTitle>
+            </CardHeader>
 
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {formatNumber(totalImpressions)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Search visibility.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Average CTR
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {formatCtr(averageCtr)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Click-through rate.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Avg. Position
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {formatPosition(averagePosition)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Lower is better.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Page 1 Keywords
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {pageOneKeywords.length}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Positions 1–10.
-            </p>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <p className="text-3xl font-bold tracking-tight text-slate-950">
+                {item.value}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Project Snapshot</CardTitle>
+            <CardTitle className="text-base text-slate-950">
+              Project Snapshot
+            </CardTitle>
             <p className="text-sm text-slate-500">
               Latest scan and keyword data status.
             </p>
@@ -553,57 +472,57 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <span className="text-sm text-slate-500">Domain</span>
-                <span className="text-sm font-medium text-slate-950">
-                  {normalizeDomainForDisplay(project.domain)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <span className="text-sm text-slate-500">Latest Audit</span>
-                <span className="text-sm font-medium text-slate-950">
-                  {formatDate(latestScanDate)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <span className="text-sm text-slate-500">Keyword Data</span>
-                <span className="text-sm font-medium text-slate-950">
-                  {latestKeywordDate}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <span className="text-sm text-slate-500">Accessibility</span>
-                <span className="text-sm font-medium text-slate-950">
-                  {accessibilityScore ?? "--"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <span className="text-sm text-slate-500">Best Practices</span>
-                <span className="text-sm font-medium text-slate-950">
-                  {bestPracticesScore ?? "--"}
-                </span>
-              </div>
+              {[
+                {
+                  label: "Domain",
+                  value: normalizeDomainForDisplay(project.domain),
+                },
+                {
+                  label: "Latest Audit",
+                  value: formatDate(latestScanDate),
+                },
+                {
+                  label: "Keyword Data",
+                  value: latestKeywordDate,
+                },
+                {
+                  label: "Accessibility",
+                  value: accessibilityScore ?? "--",
+                },
+                {
+                  label: "Best Practices",
+                  value: bestPracticesScore ?? "--",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4"
+                >
+                  <span className="text-sm text-slate-500">{item.label}</span>
+                  <span className="text-right text-sm font-semibold text-slate-950">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Recommended Next Actions</CardTitle>
+            <CardTitle className="text-base text-slate-950">
+              Recommended Next Actions
+            </CardTitle>
             <p className="text-sm text-slate-500">
-              Suggested actions based on latest project data.
+              Suggested focus based on latest project data.
             </p>
           </CardHeader>
 
           <CardContent>
             <div className="grid gap-3">
               {!latestAudit && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-medium text-slate-950">
+                <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                  <p className="font-semibold text-slate-950">
                     Run the first SEO audit
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
@@ -614,23 +533,23 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               )}
 
               {issueCount > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-medium text-slate-950">
+                <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                  <p className="font-semibold text-slate-950">
                     Fix detected SEO issues
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
-                    Review title, meta, heading, crawl, and on-page issues from
+                    Review metadata, headings, crawl, and on-page issues from
                     the latest audit.
                   </p>
                 </div>
               )}
 
               {nearPageOneKeywords.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-medium text-slate-950">
+                <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
+                  <p className="font-semibold text-[#7a5b00]">
                     Improve near page 1 keywords
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-[#7a5b00]/80">
                     Strengthen internal links and content relevance for keywords
                     ranking in positions 11–20.
                   </p>
@@ -638,11 +557,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               )}
 
               {lowCtrKeywords.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-medium text-slate-950">
+                <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
+                  <p className="font-semibold text-[#7a5b00]">
                     Improve low CTR keywords
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-[#7a5b00]/80">
                     Update title tags and meta descriptions for keywords with
                     impressions but weak clicks.
                   </p>
@@ -650,8 +569,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               )}
 
               {latestAudit && issueCount === 0 && keywordCount === 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="font-medium text-slate-950">
+                <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                  <p className="font-semibold text-slate-950">
                     Import keyword data
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
@@ -666,11 +585,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 keywordCount > 0 &&
                 lowCtrKeywords.length === 0 &&
                 nearPageOneKeywords.length === 0 && (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                    <p className="font-medium text-emerald-900">
+                  <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
+                    <p className="font-semibold text-[#7a5b00]">
                       Project is in good shape
                     </p>
-                    <p className="mt-1 text-sm text-emerald-700">
+                    <p className="mt-1 text-sm text-[#7a5b00]/80">
                       Continue monitoring audits and keyword data after major
                       website updates.
                     </p>
@@ -682,37 +601,29 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <CardTitle>Latest SEO Issues</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  Top issues from the latest audit.
-                </p>
-              </div>
-
-              <Button asChild variant="outline" size="sm" className="rounded-xl">
-                <Link href={`/dashboard/projects/${project.id}/history`}>
-                  View History
-                </Link>
-              </Button>
-            </div>
+            <CardTitle className="text-base text-slate-950">
+              Latest SEO Issues
+            </CardTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              Top findings from the latest audit.
+            </p>
           </CardHeader>
 
           <CardContent>
             {topIssues.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-6">
+              <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
                 <p className="text-sm text-slate-500">
                   No SEO issues found yet. Run an audit to detect technical and
                   on-page issues.
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-hidden rounded-2xl border border-[#e6dcc8]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50">
+                    <TableRow className="bg-[#faf7ef]">
                       <TableHead>Issue</TableHead>
                       <TableHead>Severity</TableHead>
                       <TableHead>Category</TableHead>
@@ -720,7 +631,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {topIssues.map((issue: AuditIssue) => (
+                    {topIssues.map((issue) => (
                       <TableRow key={issue.id}>
                         <TableCell>
                           <div>
@@ -755,37 +666,29 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <CardTitle>Top Keywords</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  Keywords with highest impressions.
-                </p>
-              </div>
-
-              <Button asChild variant="outline" size="sm" className="rounded-xl">
-                <Link href={`/dashboard/projects/${project.id}/keywords`}>
-                  View Keywords
-                </Link>
-              </Button>
-            </div>
+            <CardTitle className="text-base text-slate-950">
+              Top Keywords
+            </CardTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              Keywords with highest impressions.
+            </p>
           </CardHeader>
 
           <CardContent>
             {topKeywords.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-6">
+              <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
                 <p className="text-sm text-slate-500">
                   No keyword data yet. Fetch Google Search Console data from the
                   Keywords page.
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-hidden rounded-2xl border border-[#e6dcc8]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50">
+                    <TableRow className="bg-[#faf7ef]">
                       <TableHead>Keyword</TableHead>
                       <TableHead>Impr.</TableHead>
                       <TableHead>Clicks</TableHead>
@@ -795,7 +698,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {topKeywords.map((keyword: Keyword) => (
+                    {topKeywords.map((keyword) => (
                       <TableRow key={keyword.id}>
                         <TableCell className="font-medium text-slate-950">
                           {keyword.query}
@@ -810,7 +713,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                         <TableCell>{formatPosition(keyword.position)}</TableCell>
 
                         <TableCell>
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                          <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-2.5 py-1 text-xs font-medium text-slate-600">
                             {getKeywordStatus(keyword)}
                           </span>
                         </TableCell>
@@ -823,75 +726,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="rounded-2xl border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle>Project Tools</CardTitle>
-          <p className="text-sm text-slate-500">
-            Continue working on this project.
-          </p>
-        </CardHeader>
-
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Button asChild className="h-auto justify-start rounded-2xl p-4">
-              <Link href={`/dashboard/projects/${project.id}/audit`}>
-                <div className="text-left">
-                  <p className="font-medium">Run Audit</p>
-                  <p className="text-xs opacity-80">
-                    Scan SEO and performance
-                  </p>
-                </div>
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto justify-start rounded-2xl p-4"
-            >
-              <Link href={`/dashboard/projects/${project.id}/keywords`}>
-                <div className="text-left">
-                  <p className="font-medium">Keywords</p>
-                  <p className="text-xs text-slate-500">
-                    Search Console data
-                  </p>
-                </div>
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto justify-start rounded-2xl p-4"
-            >
-              <Link href={`/dashboard/projects/${project.id}/history`}>
-                <div className="text-left">
-                  <p className="font-medium">History</p>
-                  <p className="text-xs text-slate-500">
-                    Previous audit runs
-                  </p>
-                </div>
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto justify-start rounded-2xl p-4"
-            >
-              <Link href={`/dashboard/projects/${project.id}/reports`}>
-                <div className="text-left">
-                  <p className="font-medium">Report</p>
-                  <p className="text-xs text-slate-500">
-                    Client-ready export
-                  </p>
-                </div>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
