@@ -52,15 +52,15 @@ function getScoreLabel(score: number | null | undefined) {
 
 function getScoreBadgeClass(score: number | null | undefined) {
   if (score === null || score === undefined) {
-    return "border-slate-200 bg-slate-50 text-slate-600";
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
 
   if (score >= 90) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (score >= 70) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   return "border-red-200 bg-red-50 text-red-700";
@@ -128,40 +128,43 @@ export default async function AuditPage({ params }: AuditPageProps) {
     latestAudit?.created_at || latestPageSpeedReport?.created_at || null;
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm sm:p-6 md:p-8">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-          <div className="space-y-5">
-            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 sm:px-4 sm:py-2">
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
               SEO Audit Runner
             </div>
 
-            <div className="space-y-3">
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-                Run a fresh SEO audit.
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
+                Run a fresh SEO audit
               </h1>
 
-              <p className="text-sm text-slate-300 sm:text-base">
+              <p className="mt-1 text-sm font-medium text-slate-600">
                 {project.name} · {normalizeDomainForDisplay(project.domain)}
               </p>
 
-              <p className="max-w-2xl text-sm leading-6 text-slate-300">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                 Scan the website for technical SEO issues, PageSpeed scores,
-                on-page metadata gaps, and report-ready recommendations.
+                metadata gaps, and report-ready recommendations.
               </p>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur sm:p-5">
-            <p className="text-sm text-slate-300">Latest SEO Score</p>
-
-            <div className="mt-3 flex items-end justify-between gap-4">
-              <p className="text-5xl font-bold sm:text-6xl">
-                {seoScore ?? "--"}
-              </p>
+          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] p-4 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
+                  Latest SEO Score
+                </p>
+                <p className="mt-2 text-4xl font-bold tracking-tight text-white">
+                  {seoScore ?? "--"}
+                </p>
+              </div>
 
               <span
-                className={`rounded-full border px-3 py-1 text-xs font-medium ${getScoreBadgeClass(
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreBadgeClass(
                   seoScore
                 )}`}
               >
@@ -169,100 +172,77 @@ export default async function AuditPage({ params }: AuditPageProps) {
               </span>
             </div>
 
-            <div className="mt-5 grid grid-cols-3 gap-2 text-sm sm:mt-6 sm:gap-3">
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Issues</p>
-                <p className="mt-1 text-xl font-semibold">
-                  {issueList.length}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Performance</p>
-                <p className="mt-1 text-xl font-semibold">
-                  {performanceScore ?? "--"}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-white/10 p-3">
-                <p className="text-slate-400">Status</p>
-                <p className="mt-1 text-xl font-semibold capitalize">
-                  {latestAudit?.status || "Ready"}
-                </p>
-              </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                {
+                  label: "Issues",
+                  value: issueList.length,
+                },
+                {
+                  label: "Perf.",
+                  value: performanceScore ?? "--",
+                },
+                {
+                  label: "Status",
+                  value: latestAudit?.status || "Ready",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-white/10 bg-white/10 p-3"
+                >
+                  <p className="text-[11px] text-slate-400">{item.label}</p>
+                  <p className="mt-1 truncate text-lg font-bold capitalize text-white">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              SEO Score
-            </CardTitle>
-          </CardHeader>
+        {[
+          {
+            label: "SEO Score",
+            value: seoScore ?? "--",
+            helper: getScoreLabel(seoScore),
+          },
+          {
+            label: "Performance",
+            value: performanceScore ?? "--",
+            helper: getScoreLabel(performanceScore),
+          },
+          {
+            label: "Accessibility",
+            value: accessibilityScore ?? "--",
+            helper: getScoreLabel(accessibilityScore),
+          },
+          {
+            label: "Best Practices",
+            value: bestPracticesScore ?? "--",
+            helper: getScoreLabel(bestPracticesScore),
+          },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {item.label}
+              </CardTitle>
+            </CardHeader>
 
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {seoScore ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(seoScore)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Performance
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {performanceScore ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(performanceScore)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Accessibility
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {accessibilityScore ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(accessibilityScore)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              Best Practices
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight">
-              {bestPracticesScore ?? "--"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {getScoreLabel(bestPracticesScore)}
-            </p>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <p className="text-3xl font-bold tracking-tight text-slate-950">
+                {item.value}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -272,51 +252,61 @@ export default async function AuditPage({ params }: AuditPageProps) {
           projectDomain={project.domain}
         />
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Audit Snapshot</CardTitle>
+            <CardTitle className="text-base text-slate-950">
+              Audit Snapshot
+            </CardTitle>
             <p className="text-sm text-slate-500">
               Latest scan status and issue breakdown.
             </p>
           </CardHeader>
 
           <CardContent className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Latest Scan</p>
-              <p className="mt-1 font-medium text-slate-950">
+            <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Latest Scan
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">
                 {formatDate(latestScanDate)}
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                <p className="text-sm text-red-700">High</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-700">
+                  High
+                </p>
                 <p className="mt-1 text-2xl font-bold text-red-900">
                   {highIssues}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm text-amber-700">Medium</p>
-                <p className="mt-1 text-2xl font-bold text-amber-900">
+              <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a5b00]">
+                  Medium
+                </p>
+                <p className="mt-1 text-2xl font-bold text-[#7a5b00]">
                   {mediumIssues}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-600">Low</p>
+              <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Low
+                </p>
                 <p className="mt-1 text-2xl font-bold text-slate-950">
                   {lowIssues}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="font-medium text-slate-950">
+            <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+              <p className="font-semibold text-slate-950">
                 What this audit checks
               </p>
 
-              <div className="mt-3 grid gap-2 text-sm text-slate-500">
+              <div className="mt-3 grid gap-2 text-sm leading-6 text-slate-500">
                 <p>• Title tag and metadata quality</p>
                 <p>• PageSpeed and Lighthouse scores</p>
                 <p>• SEO score and technical issues</p>
