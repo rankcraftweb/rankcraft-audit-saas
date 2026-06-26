@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -41,6 +39,13 @@ type KeywordInsight = GscKeywordRow & {
   status: string;
   reason: string;
 };
+
+function normalizeDomainForDisplay(domain: string) {
+  return domain
+    .replace("https://", "")
+    .replace("http://", "")
+    .replace(/\/$/, "");
+}
 
 function getKeywordIntent(query: string) {
   const lowerQuery = query.toLowerCase();
@@ -109,38 +114,38 @@ function getKeywordStatus(keyword: GscKeywordRow) {
 
 function getKeywordStatusClass(status: string) {
   if (status === "Ranking Well") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (status === "Opportunity") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (status === "Low CTR" || status === "CTR Gap") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (status === "Needs Work") {
-    return "border-orange-200 bg-orange-50 text-orange-700";
+    return "border-red-200 bg-red-50 text-red-700";
   }
 
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
 }
 
 function getIntentClass(intent: string) {
   if (intent === "Commercial") {
-    return "border-purple-200 bg-purple-50 text-purple-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (intent === "Informational") {
-    return "border-cyan-200 bg-cyan-50 text-cyan-700";
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
 
   if (intent === "Brand") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-[#2b2413] bg-[#111111] text-[#d4af37]";
   }
 
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-[#e6dcc8] bg-white text-slate-600";
 }
 
 function getOpportunityReason(keyword: GscKeywordRow) {
@@ -150,7 +155,7 @@ function getOpportunityReason(keyword: GscKeywordRow) {
   const position = Number(keyword.position || 0);
 
   if (position > 3 && position <= 15) {
-    return "Close to page one. Improve content depth, internal links, and page targeting.";
+    return "Close to stronger ranking visibility. Improve content depth, internal links, and page targeting.";
   }
 
   if (position > 15 && position <= 50) {
@@ -166,7 +171,7 @@ function getOpportunityReason(keyword: GscKeywordRow) {
   }
 
   if (position > 0 && position <= 3) {
-    return "Ranking well. Keep content fresh and protect the page with internal links.";
+    return "Ranking well. Keep the content fresh and protect the page with internal links.";
   }
 
   return "Keep monitoring this keyword as more Search Console data comes in.";
@@ -299,7 +304,7 @@ function getLowCtrKeyword(rows: GscKeywordRow[]) {
 
 function formatDate(date: string | null | undefined) {
   if (!date) {
-    return "No date available";
+    return "No import yet";
   }
 
   return new Date(date).toLocaleString();
@@ -428,196 +433,147 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
   }));
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Google Search Console
-          </p>
-          <h2 className="mt-1 text-3xl font-bold tracking-tight">
-            Keyword Performance
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Track search visibility, clicks, CTR gaps, and ranking opportunities
-            for {project.name}.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}`}>Overview</Link>
-          </Button>
-
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}/reports`}>
-              Reports
-            </Link>
-          </Button>
-
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}/recommendations`}>
-              Recommendations
-            </Link>
-          </Button>
-
-          <Button asChild>
-            <Link href={`/dashboard/projects/${project.id}/audit`}>
-              Run Audit
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      <section className="overflow-hidden rounded-[2rem] border bg-white shadow-sm">
-        <div className="relative p-8">
-          <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-blue-100 blur-3xl" />
-          <div className="absolute right-28 top-10 h-36 w-36 rounded-full bg-emerald-100 blur-3xl" />
-
-          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  {project.domain}
-                </p>
-                <h1 className="mt-2 text-4xl font-bold tracking-tight">
-                  Search visibility dashboard
-                </h1>
-              </div>
-
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Use this page to find which keywords are already working, which
-                ones are close to improving, and which search snippets need CTR
-                optimization.
-              </p>
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
+              Google Search Console
             </div>
 
-            <Card className="border-slate-200 bg-background/90 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Latest Keyword Sync</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Date Range</span>
-                  <span className="font-medium">{latestKeywordDate}</span>
-                </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
+                Keyword Performance
+              </h1>
 
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Rows Loaded</span>
-                  <span className="font-medium">
-                    {formatNumber(keywordList.length)}
-                  </span>
-                </div>
+              <p className="mt-1 text-sm font-medium text-slate-600">
+                {project.name} · {normalizeDomainForDisplay(project.domain)}
+              </p>
 
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Last Imported</span>
-                  <span className="font-medium">
-                    {formatDate(allKeywordRows[0]?.created_at)}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                Track search visibility, clicks, CTR gaps, ranking positions,
+                and keyword opportunities from the latest GSC sync.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] p-4 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
+                  Latest Keyword Sync
+                </p>
+                <p className="mt-2 text-2xl font-bold tracking-tight text-white">
+                  {formatNumber(keywordList.length)}
+                </p>
+              </div>
+
+              <span className="rounded-full border border-[#d4af37]/50 bg-[#d4af37] px-3 py-1 text-xs font-semibold text-black">
+                {keywordList.length > 0 ? "Synced" : "No Data"}
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between gap-4 rounded-xl border border-white/10 bg-white/10 p-3">
+                <span className="text-slate-400">Date Range</span>
+                <span className="text-right font-semibold text-white">
+                  {latestKeywordDate}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4 rounded-xl border border-white/10 bg-white/10 p-3">
+                <span className="text-slate-400">Last Imported</span>
+                <span className="text-right font-semibold text-white">
+                  {formatDate(allKeywordRows[0]?.created_at)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {keywordList.length === 0 ? (
-        <Card className="border-dashed bg-slate-50 shadow-sm">
-          <CardContent className="flex min-h-[340px] flex-col items-center justify-center p-10 text-center">
-            <div className="rounded-full border bg-white px-4 py-2 text-sm font-medium text-muted-foreground">
-              No GSC keyword data yet
+        <Card className="rounded-2xl border-dashed border-[#d4af37]/50 bg-white shadow-sm">
+          <CardContent className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#111111] text-lg font-bold text-[#d4af37]">
+              GSC
             </div>
 
-            <h3 className="mt-5 text-2xl font-bold tracking-tight">
-              Sync Google Search Console keywords first
-            </h3>
+            <h2 className="mt-5 text-xl font-bold tracking-tight text-slate-950">
+              No keyword data yet
+            </h2>
 
-            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Once keyword rows are imported, this page will show clicks,
-              impressions, CTR, average position, ranking wins, and SEO
-              opportunities.
+            <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+              Once Google Search Console keyword rows are imported, this page
+              will show clicks, impressions, CTR, ranking positions, and
+              optimization opportunities.
             </p>
-
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button asChild>
-                <Link href={`/dashboard/projects/${project.id}/audit`}>
-                  Run Audit
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}/recommendations`}>
-                  Recommendations
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}/reports`}>
-                  View Report
-                </Link>
-              </Button>
-            </div>
           </CardContent>
         </Card>
       ) : (
         <>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             {[
               {
                 label: "Tracked Keywords",
                 value: formatNumber(keywordList.length),
-                helper: "Latest synced queries",
+                helper: "Latest synced queries.",
               },
               {
                 label: "Total Clicks",
                 value: formatNumber(totalClicks),
-                helper: "From organic search",
+                helper: "Organic search clicks.",
               },
               {
                 label: "Impressions",
                 value: formatNumber(totalImpressions),
-                helper: "Search visibility",
+                helper: "Search visibility.",
               },
               {
                 label: "Average CTR",
                 value: formatCtr(averageCtr),
-                helper: "Click-through rate",
+                helper: "Click-through rate.",
               },
               {
                 label: "Avg. Position",
                 value: formatPosition(averagePosition),
-                helper: "Lower is better",
+                helper: "Lower is better.",
               },
             ].map((item) => (
-              <Card key={item.label} className="shadow-sm">
+              <Card
+                key={item.label}
+                className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+              >
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                     {item.label}
                   </CardTitle>
                 </CardHeader>
+
                 <CardContent>
-                  <p className="text-3xl font-bold tracking-tight">
+                  <p className="text-3xl font-bold tracking-tight text-slate-950">
                     {item.value}
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {item.helper}
-                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
                 </CardContent>
               </Card>
             ))}
-          </section>
+          </div>
 
-          <section className="grid gap-4 lg:grid-cols-3">
-            <Card className="border-emerald-200 bg-emerald-50 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
               <CardHeader>
-                <CardTitle className="text-sm text-emerald-900">
+                <CardTitle className="text-sm text-slate-950">
                   Best Ranking Keyword
                 </CardTitle>
               </CardHeader>
+
               <CardContent>
-                <p className="text-xl font-bold text-emerald-950">
+                <p className="text-xl font-bold text-slate-950">
                   {bestRankingKeyword?.query || "No ranking data yet"}
                 </p>
-                <p className="mt-3 text-sm leading-6 text-emerald-800">
+
+                <p className="mt-3 text-sm leading-6 text-slate-500">
                   {bestRankingKeyword
                     ? `Position ${formatPosition(
                         bestRankingKeyword.position
@@ -629,17 +585,19 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-blue-200 bg-blue-50 shadow-sm">
+            <Card className="rounded-2xl border-[#d4af37]/50 bg-[#fff8df] shadow-sm">
               <CardHeader>
-                <CardTitle className="text-sm text-blue-900">
+                <CardTitle className="text-sm text-[#7a5b00]">
                   Top Opportunity
                 </CardTitle>
               </CardHeader>
+
               <CardContent>
-                <p className="text-xl font-bold text-blue-950">
+                <p className="text-xl font-bold text-[#7a5b00]">
                   {topOpportunityKeyword?.query || "No opportunity keyword yet"}
                 </p>
-                <p className="mt-3 text-sm leading-6 text-blue-800">
+
+                <p className="mt-3 text-sm leading-6 text-[#7a5b00]/80">
                   {topOpportunityKeyword
                     ? `Position ${formatPosition(
                         topOpportunityKeyword.position
@@ -651,17 +609,19 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-amber-200 bg-amber-50 shadow-sm">
+            <Card className="rounded-2xl border-[#e6dcc8] bg-[#faf7ef] shadow-sm">
               <CardHeader>
-                <CardTitle className="text-sm text-amber-900">
+                <CardTitle className="text-sm text-slate-950">
                   CTR Review
                 </CardTitle>
               </CardHeader>
+
               <CardContent>
-                <p className="text-xl font-bold text-amber-950">
+                <p className="text-xl font-bold text-slate-950">
                   {lowCtrKeyword?.query || "No CTR issue yet"}
                 </p>
-                <p className="mt-3 text-sm leading-6 text-amber-800">
+
+                <p className="mt-3 text-sm leading-6 text-slate-500">
                   {lowCtrKeyword
                     ? `${formatCtr(lowCtrKeyword.ctr)} CTR from ${formatNumber(
                         lowCtrKeyword.impressions
@@ -670,75 +630,77 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
                 </p>
               </CardContent>
             </Card>
-          </section>
+          </div>
 
-          <section className="grid gap-4 md:grid-cols-3">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm">Page 1 Keywords</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold tracking-tight">
-                  {pageOneKeywords.length}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Keywords ranking from positions 1–10.
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              {
+                label: "Page 1 Keywords",
+                value: pageOneKeywords.length,
+                helper: "Ranking from positions 1–10.",
+              },
+              {
+                label: "Opportunities",
+                value: opportunityKeywords.length,
+                helper: "Close to stronger movement.",
+              },
+              {
+                label: "Low CTR Keywords",
+                value: lowCtrKeywords.length,
+                helper: "Visibility with weak clicks.",
+              },
+            ].map((item) => (
+              <Card
+                key={item.label}
+                className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    {item.label}
+                  </CardTitle>
+                </CardHeader>
 
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm">Opportunities</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold tracking-tight">
-                  {opportunityKeywords.length}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Keywords close to page one movement.
-                </p>
-              </CardContent>
-            </Card>
+                <CardContent>
+                  <p className="text-3xl font-bold tracking-tight text-slate-950">
+                    {item.value}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm">Low CTR Keywords</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold tracking-tight">
-                  {lowCtrKeywords.length}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Visibility with weak click performance.
-                </p>
-              </CardContent>
-            </Card>
-          </section>
-
-          <Card className="shadow-sm">
+          <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
             <CardHeader>
-              <CardTitle>Top Keyword Opportunities</CardTitle>
+              <CardTitle className="text-base text-slate-950">
+                Top Keyword Opportunities
+              </CardTitle>
+              <p className="text-sm text-slate-500">
+                Keywords with the strongest improvement potential from the
+                latest sync.
+              </p>
             </CardHeader>
 
             <CardContent>
               {topOpportunities.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No keyword opportunities found in the latest synced data.
-                </p>
+                <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
+                  <p className="text-sm text-slate-500">
+                    No keyword opportunities found in the latest synced data.
+                  </p>
+                </div>
               ) : (
                 <div className="grid gap-3">
                   {topOpportunities.map((keyword, index) => (
                     <div
                       key={keyword.id}
-                      className="rounded-2xl border bg-white p-4 shadow-sm"
+                      className="rounded-2xl border border-[#e6dcc8] bg-white p-4 shadow-sm"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9a7a19]">
                             Opportunity #{index + 1}
                           </p>
-                          <h3 className="mt-1 text-lg font-semibold">
+                          <h3 className="mt-1 text-lg font-semibold text-slate-950">
                             {keyword.query}
                           </h3>
                         </div>
@@ -760,49 +722,45 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
                             {keyword.status}
                           </span>
 
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                          <span className="rounded-full border border-[#2b2413] bg-[#111111] px-3 py-1 text-xs font-medium text-[#d4af37]">
                             Score {keyword.opportunityScore}
                           </span>
                         </div>
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">
+                        <div className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3">
+                          <p className="text-xs text-slate-500">
                             Impressions
                           </p>
-                          <p className="mt-1 font-semibold">
+                          <p className="mt-1 font-semibold text-slate-950">
                             {formatNumber(keyword.impressions)}
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">
-                            Clicks
-                          </p>
-                          <p className="mt-1 font-semibold">
+                        <div className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3">
+                          <p className="text-xs text-slate-500">Clicks</p>
+                          <p className="mt-1 font-semibold text-slate-950">
                             {formatNumber(keyword.clicks)}
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">CTR</p>
-                          <p className="mt-1 font-semibold">
+                        <div className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3">
+                          <p className="text-xs text-slate-500">CTR</p>
+                          <p className="mt-1 font-semibold text-slate-950">
                             {formatCtr(keyword.ctr)}
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">
-                            Position
-                          </p>
-                          <p className="mt-1 font-semibold">
+                        <div className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3">
+                          <p className="text-xs text-slate-500">Position</p>
+                          <p className="mt-1 font-semibold text-slate-950">
                             {formatPosition(keyword.position)}
                           </p>
                         </div>
                       </div>
 
-                      <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                      <p className="mt-4 text-sm leading-6 text-slate-500">
                         {keyword.reason}
                       </p>
                     </div>
@@ -812,16 +770,21 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
             <CardHeader>
-              <CardTitle>All Keywords</CardTitle>
+              <CardTitle className="text-base text-slate-950">
+                All Keywords
+              </CardTitle>
+              <p className="text-sm text-slate-500">
+                Latest synced keyword rows from Google Search Console.
+              </p>
             </CardHeader>
 
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-2xl border border-[#e6dcc8]">
                 <Table className="min-w-[980px]">
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-[#faf7ef]">
                       <TableHead>Keyword</TableHead>
                       <TableHead>Intent</TableHead>
                       <TableHead>Status</TableHead>
@@ -836,7 +799,7 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
                   <TableBody>
                     {keywordRows.map((keyword) => (
                       <TableRow key={keyword.id}>
-                        <TableCell className="max-w-[320px] font-medium">
+                        <TableCell className="max-w-[320px] font-medium text-slate-950">
                           {keyword.query}
                         </TableCell>
 
@@ -860,23 +823,23 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
                           </span>
                         </TableCell>
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center font-medium text-slate-950">
                           {formatNumber(keyword.clicks)}
                         </TableCell>
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center font-medium text-slate-950">
                           {formatNumber(keyword.impressions)}
                         </TableCell>
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center font-medium text-slate-950">
                           {formatCtr(keyword.ctr)}
                         </TableCell>
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center font-medium text-slate-950">
                           {formatPosition(keyword.position)}
                         </TableCell>
 
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-slate-500">
                           {formatShortDate(keyword.start_date)} -{" "}
                           {formatShortDate(keyword.end_date)}
                         </TableCell>
