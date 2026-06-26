@@ -1,7 +1,24 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 
-export default function HomePage() {
+async function signOut() {
+  "use server";
+
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+
+  redirect("/");
+}
+
+export default async function HomePage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const features = [
     {
       title: "Run SEO audits",
@@ -23,8 +40,8 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <header className="border-b border-white/10 bg-[#0f0f0f]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-6">
-          <Link href="/" className="flex items-center gap-3">
+        <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-5 md:px-6">
+          <Link href="/" className="flex items-center gap-3 justify-self-start">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-xs font-bold text-[#f5d56a]">
               RC
             </div>
@@ -35,17 +52,68 @@ export default function HomePage() {
             </div>
           </Link>
 
-          <nav className="flex items-center gap-6 text-sm text-slate-300">
+          <nav className="hidden items-center gap-7 justify-self-center text-sm text-slate-300 md:flex">
             <a href="#features" className="hover:text-[#f5d56a]">
               Features
             </a>
+
             <Link href="/pricing" className="hover:text-[#f5d56a]">
               Pricing
             </Link>
-            <Link href="/dashboard" className="hover:text-[#f5d56a]">
-              Dashboard
-            </Link>
           </nav>
+
+          <div className="flex items-center gap-3 justify-self-end">
+            {user ? (
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-[#d4af37]/40 hover:bg-white/10"
+                >
+                  Logout
+                </button>
+              </form>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden text-sm font-medium text-slate-300 transition hover:text-[#f5d56a] sm:inline-flex"
+                >
+                  Login
+                </Link>
+
+                <Button asChild>
+                  <Link href="/signup">Sign up</Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-white/10 px-4 py-3 md:hidden">
+          <div className="mx-auto flex max-w-6xl items-center justify-center gap-5 text-sm text-slate-300">
+            <a href="#features" className="hover:text-[#f5d56a]">
+              Features
+            </a>
+
+            <Link href="/pricing" className="hover:text-[#f5d56a]">
+              Pricing
+            </Link>
+
+            {user ? (
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="text-sm text-slate-300 hover:text-[#f5d56a]"
+                >
+                  Logout
+                </button>
+              </form>
+            ) : (
+              <Link href="/login" className="hover:text-[#f5d56a]">
+                Login
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -78,7 +146,9 @@ export default function HomePage() {
 
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
-                <Link href="/dashboard">View Dashboard</Link>
+                <Link href={user ? "/dashboard" : "/signup"}>
+                  {user ? "View Dashboard" : "Get Started"}
+                </Link>
               </Button>
 
               <Button
@@ -145,7 +215,9 @@ export default function HomePage() {
 
             <div className="flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/dashboard/projects/new">Add Project</Link>
+                <Link href={user ? "/dashboard/projects/new" : "/signup"}>
+                  {user ? "Add Project" : "Create Account"}
+                </Link>
               </Button>
 
               <Button
