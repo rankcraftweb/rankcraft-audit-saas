@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import ConnectGscButton from "@/components/connect-gsc-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,57 +15,69 @@ type Project = {
   created_at: string;
 };
 
-type PageSpeedReport = {
-  project_id: string;
-  seo_score: number | null;
-  performance_score: number | null;
-  accessibility_score: number | null;
-  best_practices_score: number | null;
-  created_at: string;
-};
-
 type Audit = {
   id: string;
   project_id: string;
   score: number | null;
   status: string | null;
-  created_at: string;
+  created_at: string | null;
 };
 
-type AuditIssue = {
-  audit_id: string;
-};
-
-type Keyword = {
+type PageSpeedReport = {
+  id: string;
   project_id: string;
+  seo_score: number | null;
+  performance_score: number | null;
+  accessibility_score: number | null;
+  best_practices_score: number | null;
+  created_at: string | null;
+};
+
+type GscKeywordRow = {
+  id: string;
+  project_id: string;
+  query: string;
   clicks: number | null;
   impressions: number | null;
+  ctr: number | null;
+  position: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string | null;
 };
 
-type GscConnection = {
-  id: string;
-  updated_at: string | null;
-};
+function normalizeDomainForDisplay(domain: string) {
+  return domain
+    .replace("https://", "")
+    .replace("http://", "")
+    .replace(/\/$/, "");
+}
 
-function formatNumber(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return "--";
+function normalizeUrl(domain: string) {
+  const trimmed = domain.trim();
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
   }
 
-  return new Intl.NumberFormat("en-US").format(value);
+  return `https://${trimmed}`;
 }
 
 function formatDate(date: string | null | undefined) {
   if (!date) {
-    return "--";
+    return "No data yet";
   }
 
   return new Date(date).toLocaleDateString();
 }
 
-function getScoreLabel(score: number | null | undefined) {
+function formatNumber(value: number | null | undefined) {
+  return Number(value || 0).toLocaleString();
+}
+
+function getScoreStatus(score: number | null | undefined) {
   if (score === null || score === undefined) {
-    return "No scan";
+    return "Not scanned";
   }
 
   if (score >= 90) {
@@ -74,19 +85,15 @@ function getScoreLabel(score: number | null | undefined) {
   }
 
   if (score >= 70) {
-    return "Needs work";
+    return "Needs improvement";
   }
 
-  return "Attention";
+  return "Needs attention";
 }
 
 function getScoreBadgeClass(score: number | null | undefined) {
   if (score === null || score === undefined) {
     return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
-  }
-
-  if (score >= 90) {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
   if (score >= 70) {
@@ -96,55 +103,73 @@ function getScoreBadgeClass(score: number | null | undefined) {
   return "border-red-200 bg-red-50 text-red-700";
 }
 
-function normalizeDomainForDisplay(domain: string) {
-  return domain
-    .replace("https://", "")
-    .replace("http://", "")
-    .replace(/\/$/, "");
+function getLatestByProjectId<T extends { project_id: string; created_at: string | null }>(
+  rows: T[]
+) {
+  const map = new Map<string, T>();
+
+  rows.forEach((row) => {
+    const current = map.get(row.project_id);
+
+    if (!current) {
+      map.set(row.project_id, row);
+      return;
+    }
+
+    const rowTime = new Date(row.created_at || 0).getTime();
+    const currentTime = new Date(current.created_at || 0).getTime();
+
+    if (rowTime > currentTime) {
+      map.set(row.project_id, row);
+    }
+  });
+
+  return map;
+}
+
+function getKeywordStats(rows: GscKeywordRow[]) {
+  const latestRangeRow = [...rows].sort((a, b) => {
+    const aTime = new Date(a.created_at || a.end_date || 0).getTime();
+    const bTime = new Date(b.created_at || b.end_date || 0).getTime();
+
+    return bTime - aTime;
+  })[0];
+
+  if (!latestRangeRow?.start_date || !latestRangeRow?.end_date) {
+    return {
+      keywordCount: 0,
+      clicks: 0,
+      impressions: 0,
+    };
+  }
+
+  const latestRows = rows.filter((row) => {
+    return (
+      row.start_date === latestRangeRow.start_date &&
+      row.end_date === latestRangeRow.end_date
+    );
+  });
+
+  return {
+    keywordCount: latestRows.length,
+    clicks: latestRows.reduce((sum, row) => sum + Number(row.clicks || 0), 0),
+    impressions: latestRows.reduce(
+      (sum, row) => sum + Number(row.impressions || 0),
+      0
+    ),
+  };
 }
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: projects, error: projectsError } = await supabase
+  const { data: projects } = await supabase
     .from("projects")
     .select("id, name, domain, created_at")
     .order("created_at", { ascending: false });
 
-  if (projectsError) {
-    return (
-      <div className="space-y-3">
-        <h2 className="text-2xl font-bold text-slate-950">Projects</h2>
-        <p className="text-sm text-red-600">{projectsError.message}</p>
-      </div>
-    );
-  }
-
-  const projectList = projects || [];
-  const projectIds = projectList.map((project: Project) => project.id);
-
-  const { data: gscConnection } = user?.id
-    ? await supabase
-        .from("gsc_connections")
-        .select("id, updated_at")
-        .eq("user_id", user.id)
-        .single()
-    : { data: null };
-
-  const { data: pageSpeedReports } =
-    projectIds.length > 0
-      ? await supabase
-          .from("pagespeed_reports")
-          .select(
-            "project_id, seo_score, performance_score, accessibility_score, best_practices_score, created_at"
-          )
-          .in("project_id", projectIds)
-          .order("created_at", { ascending: false })
-      : { data: [] };
+  const projectList = (projects || []) as Project[];
+  const projectIds = projectList.map((project) => project.id);
 
   const { data: audits } =
     projectIds.length > 0
@@ -155,389 +180,289 @@ export default async function ProjectsPage() {
           .order("created_at", { ascending: false })
       : { data: [] };
 
-  const auditIds = audits?.map((audit: Audit) => audit.id) || [];
-
-  const { data: auditIssues } =
-    auditIds.length > 0
-      ? await supabase
-          .from("audit_issues")
-          .select("audit_id")
-          .in("audit_id", auditIds)
-      : { data: [] };
-
-  const { data: keywords } =
+  const { data: pageSpeedReports } =
     projectIds.length > 0
       ? await supabase
-          .from("keywords")
-          .select("project_id, clicks, impressions")
+          .from("pagespeed_reports")
+          .select(
+            "id, project_id, seo_score, performance_score, accessibility_score, best_practices_score, created_at"
+          )
           .in("project_id", projectIds)
+          .order("created_at", { ascending: false })
       : { data: [] };
 
-  const latestReportByProject = new Map<string, PageSpeedReport>();
+  const { data: gscKeywordRows } =
+    projectIds.length > 0
+      ? await supabase
+          .from("gsc_keyword_rows")
+          .select(
+            "id, project_id, query, clicks, impressions, ctr, position, start_date, end_date, created_at"
+          )
+          .in("project_id", projectIds)
+          .order("created_at", { ascending: false })
+          .limit(1000)
+      : { data: [] };
 
-  pageSpeedReports?.forEach((report: PageSpeedReport) => {
-    if (!latestReportByProject.has(report.project_id)) {
-      latestReportByProject.set(report.project_id, report);
-    }
-  });
+  const auditList = (audits || []) as Audit[];
+  const pageSpeedList = (pageSpeedReports || []) as PageSpeedReport[];
+  const keywordRows = (gscKeywordRows || []) as GscKeywordRow[];
 
-  const latestAuditByProject = new Map<string, Audit>();
-
-  audits?.forEach((audit: Audit) => {
-    if (!latestAuditByProject.has(audit.project_id)) {
-      latestAuditByProject.set(audit.project_id, audit);
-    }
-  });
-
-  const issueCountByAudit = new Map<string, number>();
-
-  auditIssues?.forEach((issue: AuditIssue) => {
-    issueCountByAudit.set(
-      issue.audit_id,
-      (issueCountByAudit.get(issue.audit_id) || 0) + 1
-    );
-  });
-
-  const keywordCountByProject = new Map<string, number>();
-  const clicksByProject = new Map<string, number>();
-  const impressionsByProject = new Map<string, number>();
-
-  keywords?.forEach((keyword: Keyword) => {
-    keywordCountByProject.set(
-      keyword.project_id,
-      (keywordCountByProject.get(keyword.project_id) || 0) + 1
-    );
-
-    clicksByProject.set(
-      keyword.project_id,
-      (clicksByProject.get(keyword.project_id) || 0) + (keyword.clicks || 0)
-    );
-
-    impressionsByProject.set(
-      keyword.project_id,
-      (impressionsByProject.get(keyword.project_id) || 0) +
-        (keyword.impressions || 0)
-    );
-  });
-
-  const latestReports = Array.from(latestReportByProject.values());
+  const latestAuditByProject = getLatestByProjectId(auditList);
+  const latestPageSpeedByProject = getLatestByProjectId(pageSpeedList);
 
   const totalProjects = projectList.length;
-  const totalIssues = auditIssues?.length || 0;
-  const totalKeywords = keywords?.length || 0;
-
-  const totalClicks =
-    keywords?.reduce((sum: number, keyword: Keyword) => {
-      return sum + (keyword.clicks || 0);
-    }, 0) || 0;
-
-  const totalImpressions =
-    keywords?.reduce((sum: number, keyword: Keyword) => {
-      return sum + (keyword.impressions || 0);
-    }, 0) || 0;
+  const scannedProjects = projectList.filter((project) => {
+    return latestAuditByProject.has(project.id) || latestPageSpeedByProject.has(project.id);
+  }).length;
 
   const averageSeoScore =
-    latestReports.length > 0
-      ? latestReports.reduce(
-          (sum: number, report: PageSpeedReport) =>
-            sum + Number(report.seo_score || 0),
-          0
-        ) / latestReports.length
+    scannedProjects > 0
+      ? Math.round(
+          projectList.reduce((sum, project) => {
+            const latestAudit = latestAuditByProject.get(project.id);
+            const latestPageSpeed = latestPageSpeedByProject.get(project.id);
+            const score = latestPageSpeed?.seo_score ?? latestAudit?.score ?? 0;
+
+            return sum + Number(score || 0);
+          }, 0) / scannedProjects
+        )
       : null;
+
+  const totalKeywords = keywordRows.length;
+  const totalImpressions = keywordRows.reduce((sum, row) => {
+    return sum + Number(row.impressions || 0);
+  }, 0);
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
-        <div className="max-w-3xl space-y-3">
-          <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
-            Website Portfolio
-          </div>
+      <section className="overflow-hidden rounded-3xl border border-[#e6dcc8] bg-white shadow-sm">
+        <div className="relative p-6 md:p-8">
+          <div className="absolute right-0 top-0 h-52 w-52 rounded-full bg-[#d4af37]/10 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-44 w-44 rounded-full bg-slate-100 blur-3xl" />
 
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
-              Projects
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Manage websites, run technical audits, review keyword visibility,
-              and generate client-ready SEO reports.
-            </p>
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+                Projects
+              </p>
+
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                SEO audit projects
+              </h1>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Manage client websites, run audits, review Google Search Console
+                keyword data, export reports, and open prioritized recommendations.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href="/dashboard/projects/new">Add Project</Link>
+              </Button>
+
+              <Button asChild variant="outline">
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-4">
         {[
           {
             label: "Total Projects",
             value: totalProjects,
-            helper: "Websites monitored.",
+            helper: "Client websites",
+            className: "border-[#e6dcc8] bg-white",
+          },
+          {
+            label: "Scanned",
+            value: scannedProjects,
+            helper: "With audit data",
+            className: "border-[#d4af37]/50 bg-[#fff8df]",
           },
           {
             label: "Avg. SEO Score",
-            value: averageSeoScore ? Math.round(averageSeoScore) : "--",
-            helper: getScoreLabel(averageSeoScore),
+            value: averageSeoScore ?? "--",
+            helper: "Across scanned projects",
+            className: "border-[#e6dcc8] bg-[#faf7ef]",
           },
           {
-            label: "Open Issues",
-            value: totalIssues,
-            helper: "Across all audits.",
-          },
-          {
-            label: "Keywords",
-            value: totalKeywords,
-            helper: "Imported from GSC.",
+            label: "Keyword Rows",
+            value: formatNumber(totalKeywords),
+            helper: `${formatNumber(totalImpressions)} impressions`,
+            className: "border-[#e6dcc8] bg-white",
           },
         ].map((item) => (
           <Card
             key={item.label}
-            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
+            className={`rounded-2xl shadow-sm ${item.className}`}
           >
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 {item.label}
               </CardTitle>
             </CardHeader>
 
             <CardContent>
-              <p className="text-3xl font-bold tracking-tight text-slate-950">
+              <p className="text-4xl font-bold tracking-tight text-slate-950">
                 {item.value}
               </p>
-              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+
+              <p className="mt-1 text-sm text-slate-500">{item.helper}</p>
             </CardContent>
           </Card>
         ))}
-      </div>
-
-      <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base text-slate-950">
-                Google Search Console
-              </CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                Connection status for keyword visibility data.
-              </p>
-            </div>
-
-            <ConnectGscButton />
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Connection Status
-              </p>
-
-              <div className="mt-3">
-                {gscConnection ? (
-                  <span className="rounded-full border border-[#d4af37]/50 bg-[#fff8df] px-3 py-1 text-xs font-semibold text-[#7a5b00]">
-                    Connected
-                  </span>
-                ) : (
-                  <span className="rounded-full border border-[#d4af37]/50 bg-[#fff8df] px-3 py-1 text-xs font-semibold text-[#7a5b00]">
-                    Not connected
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-3 text-xs text-slate-500">
-                {gscConnection
-                  ? `Last connected: ${formatDate(
-                      (gscConnection as GscConnection).updated_at
-                    )}`
-                  : "Connect GSC to pull real keyword data."}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Total Clicks
-              </p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-                {formatNumber(totalClicks)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                From imported keyword data.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Total Impressions
-              </p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-                {formatNumber(totalImpressions)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Search visibility across projects.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      </section>
 
       {projectList.length === 0 ? (
-        <Card className="rounded-2xl border-dashed border-[#d4af37]/50 bg-white shadow-sm">
-          <CardContent className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#111111] text-lg font-bold text-[#d4af37]">
-              RC
+        <Card className="rounded-3xl border-dashed border-[#d4af37]/50 bg-[#faf7ef] shadow-sm">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#d4af37]/40 bg-white text-lg font-bold text-[#9a7a19]">
+              +
             </div>
 
-            <h2 className="mt-5 text-xl font-bold tracking-tight text-slate-950">
-              Add your first website
+            <h2 className="mt-4 text-xl font-bold text-slate-950">
+              No projects yet
             </h2>
 
-            <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Create a project to run SEO audits, fetch PageSpeed scores, import
-              Search Console keywords, and generate reports.
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+              Add your first client website to start running audits, syncing
+              keyword data, and creating client-ready reports.
             </p>
 
-            <Button
-              asChild
-              className="mt-5 rounded-xl bg-[#111111] text-white hover:bg-black"
-            >
-              <Link href="/dashboard/projects/new">Create Project</Link>
+            <Button asChild className="mt-6">
+              <Link href="/dashboard/projects/new">Add First Project</Link>
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {projectList.map((project: Project) => {
-            const latestReport = latestReportByProject.get(project.id);
+        <section className="grid gap-4">
+          {projectList.map((project) => {
             const latestAudit = latestAuditByProject.get(project.id);
-            const issueCount = latestAudit?.id
-              ? issueCountByAudit.get(latestAudit.id) || 0
-              : 0;
-            const keywordCount = keywordCountByProject.get(project.id) || 0;
-            const clicks = clicksByProject.get(project.id) || 0;
-            const impressions = impressionsByProject.get(project.id) || 0;
+            const latestPageSpeed = latestPageSpeedByProject.get(project.id);
+            const seoScore = latestPageSpeed?.seo_score ?? latestAudit?.score;
+            const latestScanDate =
+              latestPageSpeed?.created_at || latestAudit?.created_at || null;
+
+            const projectKeywordRows = keywordRows.filter((row) => {
+              return row.project_id === project.id;
+            });
+
+            const keywordStats = getKeywordStats(projectKeywordRows);
 
             return (
               <Card
                 key={project.id}
-                className="group rounded-2xl border-[#e6dcc8] bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-[#d4af37]/60 hover:shadow-md"
+                className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#111111] text-sm font-bold text-[#d4af37]">
-                          {project.name.charAt(0).toUpperCase()}
-                        </div>
+                <CardContent className="p-5">
+                  <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreBadgeClass(
+                            seoScore
+                          )}`}
+                        >
+                          {getScoreStatus(seoScore)}
+                        </span>
 
-                        <div className="min-w-0">
-                          <CardTitle className="truncate text-base text-slate-950">
-                            {project.name}
-                          </CardTitle>
-                          <p className="truncate text-xs text-slate-500">
-                            {normalizeDomainForDisplay(project.domain)}
-                          </p>
-                        </div>
+                        <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-3 py-1 text-xs font-medium text-slate-600">
+                          Created {formatDate(project.created_at)}
+                        </span>
                       </div>
-                    </div>
 
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreBadgeClass(
-                        latestReport?.seo_score
-                      )}`}
-                    >
-                      SEO {latestReport?.seo_score ?? "--"} ·{" "}
-                      {getScoreLabel(latestReport?.seo_score)}
-                    </span>
-                  </div>
-                </CardHeader>
+                      <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
+                        <Link
+                          href={`/dashboard/projects/${project.id}`}
+                          className="underline-offset-4 hover:text-[#9a7a19] hover:underline"
+                        >
+                          {project.name}
+                        </Link>
+                      </h2>
 
-                <CardContent className="space-y-4">
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    {[
-                      {
-                        label: "Performance",
-                        value: latestReport?.performance_score ?? "--",
-                      },
-                      {
-                        label: "Issues",
-                        value: issueCount,
-                      },
-                      {
-                        label: "Keywords",
-                        value: keywordCount,
-                      },
-                      {
-                        label: "Impressions",
-                        value: formatNumber(impressions),
-                      },
-                    ].map((metric) => (
-                      <div
-                        key={metric.label}
-                        className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3"
+                      <a
+                        href={normalizeUrl(project.domain)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex text-sm font-medium text-slate-500 underline-offset-4 hover:text-[#9a7a19] hover:underline"
                       >
-                        <p className="text-[11px] font-medium text-slate-500">
-                          {metric.label}
-                        </p>
-                        <p className="mt-1 text-lg font-bold text-slate-950">
-                          {metric.value}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                        {normalizeDomainForDisplay(project.domain)}
+                      </a>
 
-                  <div className="rounded-xl border border-[#e6dcc8] bg-white p-4">
-                    <div className="grid gap-3 text-xs sm:grid-cols-3">
-                      <div>
-                        <p className="text-slate-500">Clicks</p>
-                        <p className="mt-1 font-semibold text-slate-950">
-                          {formatNumber(clicks)}
-                        </p>
-                      </div>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+                        Last scan:{" "}
+                        <span className="font-semibold text-slate-950">
+                          {formatDate(latestScanDate)}
+                        </span>
+                        . Open the project overview to continue audit, keyword,
+                        report, and recommendation work.
+                      </p>
+                    </div>
 
-                      <div>
-                        <p className="text-slate-500">Latest Audit</p>
-                        <p className="mt-1 font-semibold text-slate-950">
-                          {latestAudit
-                            ? formatDate(latestAudit.created_at)
-                            : "Not run yet"}
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          SEO Score
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-slate-950">
+                          {seoScore ?? "--"}
                         </p>
                       </div>
 
-                      <div>
-                        <p className="text-slate-500">Created</p>
-                        <p className="mt-1 font-semibold text-slate-950">
-                          {formatDate(project.created_at)}
+                      <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Keywords
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-slate-950">
+                          {keywordStats.keywordCount}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
+                          Impressions
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-slate-950">
+                          {formatNumber(keywordStats.impressions)}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      asChild
-                      className="h-9 rounded-xl bg-[#111111] px-3 text-xs text-white hover:bg-black"
-                    >
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Button asChild>
                       <Link href={`/dashboard/projects/${project.id}`}>
-                        Open Project
+                        Overview
                       </Link>
                     </Button>
 
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="h-9 rounded-xl border-[#e6dcc8] bg-white px-3 text-xs text-slate-700 hover:bg-[#faf7ef]"
-                    >
+                    <Button asChild variant="outline">
                       <Link href={`/dashboard/projects/${project.id}/audit`}>
                         Audit
                       </Link>
                     </Button>
 
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="h-9 rounded-xl border-[#e6dcc8] bg-white px-3 text-xs text-slate-700 hover:bg-[#faf7ef]"
-                    >
+                    <Button asChild variant="outline">
+                      <Link href={`/dashboard/projects/${project.id}/keywords`}>
+                        Keywords
+                      </Link>
+                    </Button>
+
+                    <Button asChild variant="outline">
                       <Link href={`/dashboard/projects/${project.id}/reports`}>
                         Report
+                      </Link>
+                    </Button>
+
+                    <Button asChild variant="outline">
+                      <Link
+                        href={`/dashboard/projects/${project.id}/recommendations`}
+                      >
+                        Actions
                       </Link>
                     </Button>
                   </div>
@@ -545,7 +470,7 @@ export default async function ProjectsPage() {
               </Card>
             );
           })}
-        </div>
+        </section>
       )}
     </div>
   );
