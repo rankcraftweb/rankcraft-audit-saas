@@ -37,128 +37,103 @@ type GscKeywordRow = {
   created_at: string | null;
 };
 
-type KeywordRecommendation = GscKeywordRow & {
-  intent: string;
-  status: string;
-  priority: string;
+type RecommendationItem = {
+  id: string;
+  title: string;
+  description: string;
+  priority: "High" | "Medium" | "Low";
+  category: string;
+  impact: string;
   action: string;
-  opportunityScore: number;
+  source: string;
 };
 
-function getSeverityLabel(severity: string | null | undefined) {
-  if (severity === "high") {
-    return "High";
-  }
-
-  if (severity === "medium") {
-    return "Medium";
-  }
-
-  return "Low";
+function normalizeDomainForDisplay(domain: string) {
+  return domain
+    .replace("https://", "")
+    .replace("http://", "")
+    .replace(/\/$/, "");
 }
 
-function getSeverityClass(severity: string | null | undefined) {
-  if (severity === "high") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
+function formatNumber(value: number | null | undefined) {
+  return Number(value || 0).toLocaleString();
+}
+
+function formatCtr(ctr: number | null | undefined) {
+  if (ctr === null || ctr === undefined) {
+    return "--";
   }
 
-  if (severity === "medium") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+  return `${(Number(ctr) * 100).toFixed(1)}%`;
+}
+
+function formatPosition(position: number | null | undefined) {
+  if (position === null || position === undefined) {
+    return "--";
   }
 
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return Number(position).toFixed(1);
 }
 
 function getPriorityClass(priority: string) {
   if (priority === "High") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
+    return "border-red-200 bg-red-50 text-red-700";
   }
 
   if (priority === "Medium") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   }
 
-  if (priority === "Opportunity") {
+  return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
+}
+
+function getCategoryClass(category: string) {
+  if (category.toLowerCase().includes("keyword")) {
+    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
+  }
+
+  if (category.toLowerCase().includes("technical")) {
+    return "border-slate-300 bg-slate-100 text-slate-700";
+  }
+
+  if (category.toLowerCase().includes("metadata")) {
     return "border-blue-200 bg-blue-50 text-blue-700";
   }
 
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-[#e6dcc8] bg-white text-slate-600";
 }
 
-function getCategoryClass(category: string | null | undefined) {
-  if (category === "technical") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
+function getLatestKeywordRange(rows: GscKeywordRow[]) {
+  const latestRow = [...rows].sort((a, b) => {
+    const aDate = new Date(a.created_at || a.end_date || 0).getTime();
+    const bDate = new Date(b.created_at || b.end_date || 0).getTime();
+
+    return bDate - aDate;
+  })[0];
+
+  if (!latestRow?.start_date || !latestRow?.end_date) {
+    return null;
   }
 
-  if (category === "metadata") {
-    return "border-purple-200 bg-purple-50 text-purple-700";
-  }
-
-  if (category === "content") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (category === "mobile") {
-    return "border-cyan-200 bg-cyan-50 text-cyan-700";
-  }
-
-  if (category === "accessibility") {
-    return "border-indigo-200 bg-indigo-50 text-indigo-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return {
+    startDate: latestRow.start_date,
+    endDate: latestRow.end_date,
+  };
 }
 
-function getIntentClass(intent: string) {
-  if (intent === "Commercial") {
-    return "border-purple-200 bg-purple-50 text-purple-700";
+function getLatestKeywordRows(rows: GscKeywordRow[]) {
+  const latestRange = getLatestKeywordRange(rows);
+
+  if (!latestRange) {
+    return [];
   }
 
-  if (intent === "Informational") {
-    return "border-cyan-200 bg-cyan-50 text-cyan-700";
-  }
-
-  if (intent === "Brand") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600";
-}
-
-function getKeywordIntent(query: string) {
-  const lowerQuery = query.toLowerCase();
-
-  if (
-    lowerQuery.includes("near me") ||
-    lowerQuery.includes("services") ||
-    lowerQuery.includes("consultant") ||
-    lowerQuery.includes("designer") ||
-    lowerQuery.includes("developer") ||
-    lowerQuery.includes("agency") ||
-    lowerQuery.includes("company")
-  ) {
-    return "Commercial";
-  }
-
-  if (
-    lowerQuery.includes("how") ||
-    lowerQuery.includes("what") ||
-    lowerQuery.includes("guide") ||
-    lowerQuery.includes("tips") ||
-    lowerQuery.includes("best")
-  ) {
-    return "Informational";
-  }
-
-  if (
-    lowerQuery.includes("rankcraft") ||
-    lowerQuery.includes("rank craft") ||
-    lowerQuery.includes("rankcraftweb")
-  ) {
-    return "Brand";
-  }
-
-  return "General";
+  return rows.filter((row) => {
+    return (
+      row.start_date === latestRange.startDate &&
+      row.end_date === latestRange.endDate
+    );
+  });
 }
 
 function getKeywordStatus(keyword: GscKeywordRow) {
@@ -190,31 +165,6 @@ function getKeywordStatus(keyword: GscKeywordRow) {
   return "Monitor";
 }
 
-function getKeywordPriority(keyword: GscKeywordRow) {
-  const impressions = Number(keyword.impressions || 0);
-  const clicks = Number(keyword.clicks || 0);
-  const ctr = Number(keyword.ctr || 0);
-  const position = Number(keyword.position || 0);
-
-  if (position > 3 && position <= 15 && impressions >= 10) {
-    return "High";
-  }
-
-  if (impressions >= 10 && clicks === 0) {
-    return "High";
-  }
-
-  if (ctr < 0.02 && impressions >= 10) {
-    return "Medium";
-  }
-
-  if (position > 15 && position <= 50) {
-    return "Opportunity";
-  }
-
-  return "Low";
-}
-
 function getKeywordAction(keyword: GscKeywordRow) {
   const impressions = Number(keyword.impressions || 0);
   const clicks = Number(keyword.clicks || 0);
@@ -222,144 +172,130 @@ function getKeywordAction(keyword: GscKeywordRow) {
   const position = Number(keyword.position || 0);
 
   if (position > 3 && position <= 15) {
-    return "Optimize the ranking page with stronger headings, deeper content, and more internal links. This keyword is already close enough to move.";
+    return "Improve the target page content, add internal links, and make sure the keyword intent is clearly matched on the page.";
   }
 
   if (impressions >= 10 && clicks === 0) {
-    return "Rewrite the title tag and meta description. This keyword is visible in search but is not earning clicks yet.";
+    return "Rewrite the title tag and meta description to make the search result more clickable.";
   }
 
   if (ctr < 0.02 && impressions >= 10) {
-    return "Improve the search snippet so the page matches the keyword intent better and earns more clicks from impressions.";
+    return "Improve the page snippet and make the title more specific to the search query.";
   }
 
   if (position > 15 && position <= 50) {
-    return "Build stronger page relevance with supporting content, better internal links, and clearer keyword targeting.";
+    return "Strengthen the page with supporting content, better headings, and internal links from relevant pages.";
   }
 
-  if (position > 0 && position <= 3) {
-    return "Protect this ranking by keeping the page updated and adding internal links from relevant pages.";
-  }
-
-  return "Monitor this keyword as more Google Search Console data becomes available.";
+  return "Keep tracking this keyword and review again after more Search Console data is available.";
 }
 
-function getOpportunityScore(keyword: GscKeywordRow) {
+function getKeywordPriority(keyword: GscKeywordRow): "High" | "Medium" | "Low" {
   const impressions = Number(keyword.impressions || 0);
   const clicks = Number(keyword.clicks || 0);
   const ctr = Number(keyword.ctr || 0);
-  const position = Number(keyword.position || 100);
+  const position = Number(keyword.position || 0);
 
-  let score = 0;
-
-  if (position > 3 && position <= 15) {
-    score += 45;
+  if (
+    (position >= 4 && position <= 15 && impressions >= 10) ||
+    (impressions >= 25 && clicks === 0)
+  ) {
+    return "High";
   }
 
-  if (position > 15 && position <= 50) {
-    score += 25;
+  if (
+    (position > 15 && position <= 50) ||
+    (ctr < 0.02 && impressions >= 10)
+  ) {
+    return "Medium";
   }
 
-  if (impressions >= 50) {
-    score += 30;
-  } else if (impressions >= 10) {
-    score += 20;
-  } else if (impressions > 0) {
-    score += 10;
-  }
-
-  if (clicks === 0 && impressions > 0) {
-    score += 20;
-  }
-
-  if (ctr < 0.02 && impressions >= 10) {
-    score += 15;
-  }
-
-  return score;
+  return "Low";
 }
 
-function getLatestKeywordRange(rows: GscKeywordRow[]) {
-  const latestRow = [...rows].sort((a, b) => {
-    const aCreated = new Date(a.created_at || a.end_date || 0).getTime();
-    const bCreated = new Date(b.created_at || b.end_date || 0).getTime();
-
-    return bCreated - aCreated;
-  })[0];
-
-  if (!latestRow?.start_date || !latestRow?.end_date) {
-    return null;
+function getIssuePriority(severity: string | null | undefined): "High" | "Medium" | "Low" {
+  if (severity === "high") {
+    return "High";
   }
 
-  return {
-    startDate: latestRow.start_date,
-    endDate: latestRow.end_date,
-  };
+  if (severity === "medium") {
+    return "Medium";
+  }
+
+  return "Low";
 }
 
-function getLatestKeywordRows(rows: GscKeywordRow[]) {
-  const latestRange = getLatestKeywordRange(rows);
+function buildIssueRecommendations(issues: AuditIssue[]) {
+  return issues.map((issue) => {
+    const priority = getIssuePriority(issue.severity);
 
-  if (!latestRange) {
-    return [];
-  }
-
-  return rows.filter((row) => {
-    return (
-      row.start_date === latestRange.startDate &&
-      row.end_date === latestRange.endDate
-    );
+    return {
+      id: `issue-${issue.id}`,
+      title: issue.title,
+      description: issue.description || "This SEO issue was detected in the latest audit.",
+      priority,
+      category: issue.category || "Technical SEO",
+      impact:
+        priority === "High"
+          ? "Can directly affect crawlability, relevance, or search visibility."
+          : priority === "Medium"
+            ? "Can improve SEO quality and reduce technical weaknesses."
+            : "Useful cleanup item for a stronger SEO foundation.",
+      action:
+        issue.recommendation ||
+        "Review this issue and apply the appropriate SEO fix.",
+      source: "Audit issue",
+    } satisfies RecommendationItem;
   });
 }
 
-function formatNumber(value: number | null | undefined) {
-  return Number(value || 0).toLocaleString();
+function buildKeywordRecommendations(keywords: GscKeywordRow[]) {
+  return keywords
+    .filter((keyword) => {
+      const status = getKeywordStatus(keyword);
+
+      return (
+        status === "Opportunity" ||
+        status === "Low CTR" ||
+        status === "CTR Gap" ||
+        status === "Needs Work"
+      );
+    })
+    .map((keyword) => {
+      const status = getKeywordStatus(keyword);
+      const priority = getKeywordPriority(keyword);
+
+      return {
+        id: `keyword-${keyword.id}`,
+        title: `Improve keyword: ${keyword.query}`,
+        description: `${status}. ${formatNumber(
+          keyword.impressions
+        )} impressions, ${formatNumber(keyword.clicks)} clicks, ${formatCtr(
+          keyword.ctr
+        )} CTR, average position ${formatPosition(keyword.position)}.`,
+        priority,
+        category: "Keyword Opportunity",
+        impact:
+          status === "Opportunity"
+            ? "This keyword is close enough to improve with focused page optimization."
+            : status === "Low CTR" || status === "CTR Gap"
+              ? "This keyword already has visibility but needs a better search snippet to earn clicks."
+              : "This keyword has visibility but needs stronger page relevance.",
+        action: getKeywordAction(keyword),
+        source: "Google Search Console",
+      } satisfies RecommendationItem;
+    });
 }
 
-function formatCtr(ctr: number | null | undefined) {
-  if (ctr === null || ctr === undefined) {
-    return "--";
-  }
-
-  return `${(Number(ctr) * 100).toFixed(1)}%`;
-}
-
-function formatPosition(position: number | null | undefined) {
-  if (position === null || position === undefined) {
-    return "--";
-  }
-
-  return Number(position).toFixed(1);
-}
-
-function formatShortDate(date: string | null | undefined) {
-  if (!date) {
-    return "--";
-  }
-
-  return new Date(date).toLocaleDateString();
-}
-
-function formatDate(date: string | null | undefined) {
-  if (!date) {
-    return "No audit yet";
-  }
-
-  return new Date(date).toLocaleString();
-}
-
-function sortIssuesByPriority(issues: AuditIssue[]) {
-  const severityOrder: Record<string, number> = {
-    high: 1,
-    medium: 2,
-    low: 3,
+function sortRecommendations(recommendations: RecommendationItem[]) {
+  const priorityWeight = {
+    High: 3,
+    Medium: 2,
+    Low: 1,
   };
 
-  return [...issues].sort((a, b) => {
-    return (
-      (severityOrder[a.severity || "low"] || 3) -
-      (severityOrder[b.severity || "low"] || 3)
-    );
+  return [...recommendations].sort((a, b) => {
+    return priorityWeight[b.priority] - priorityWeight[a.priority];
   });
 }
 
@@ -372,7 +308,7 @@ export default async function RecommendationsPage({
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("id, name, domain")
+    .select("id, name, domain, created_at")
     .eq("id", id)
     .single();
 
@@ -409,210 +345,135 @@ export default async function RecommendationsPage({
 
   const issueList = (issues || []) as AuditIssue[];
   const allKeywordRows = (gscKeywordRows || []) as GscKeywordRow[];
-  const keywordList = getLatestKeywordRows(allKeywordRows);
+  const latestKeywordRows = getLatestKeywordRows(allKeywordRows);
 
-  const highIssues = issueList.filter((issue) => issue.severity === "high");
-  const mediumIssues = issueList.filter((issue) => issue.severity === "medium");
-  const lowIssues = issueList.filter((issue) => issue.severity === "low");
+  const issueRecommendations = buildIssueRecommendations(issueList);
+  const keywordRecommendations = buildKeywordRecommendations(latestKeywordRows);
 
-  const keywordRecommendations: KeywordRecommendation[] = keywordList
-    .map((keyword) => ({
-      ...keyword,
-      intent: getKeywordIntent(keyword.query),
-      status: getKeywordStatus(keyword),
-      priority: getKeywordPriority(keyword),
-      action: getKeywordAction(keyword),
-      opportunityScore: getOpportunityScore(keyword),
-    }))
-    .filter((keyword) => keyword.opportunityScore > 0)
-    .sort((a, b) => b.opportunityScore - a.opportunityScore)
-    .slice(0, 8);
+  const recommendations = sortRecommendations([
+    ...issueRecommendations,
+    ...keywordRecommendations,
+  ]).slice(0, 12);
 
-  const topIssues = sortIssuesByPriority(issueList);
+  const highCount = recommendations.filter(
+    (item) => item.priority === "High"
+  ).length;
 
-  const latestKeywordRange = getLatestKeywordRange(allKeywordRows);
-  const latestKeywordDate = latestKeywordRange
-    ? `${formatShortDate(latestKeywordRange.startDate)} - ${formatShortDate(
-        latestKeywordRange.endDate
-      )}`
-    : "No keyword data yet";
+  const mediumCount = recommendations.filter(
+    (item) => item.priority === "Medium"
+  ).length;
 
-  const totalClicks = keywordList.reduce((sum, keyword) => {
-    return sum + Number(keyword.clicks || 0);
-  }, 0);
-
-  const totalImpressions = keywordList.reduce((sum, keyword) => {
-    return sum + Number(keyword.impressions || 0);
-  }, 0);
-
-  const hasAnyData = issueList.length > 0 || keywordRecommendations.length > 0;
+  const lowCount = recommendations.filter(
+    (item) => item.priority === "Low"
+  ).length;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            SEO Action Plan
-          </p>
-          <h2 className="mt-1 text-3xl font-bold tracking-tight">
-            Recommendations
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Prioritized SEO fixes and keyword actions for {project.name}.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <section className="overflow-hidden rounded-3xl border border-[#e6dcc8] bg-white shadow-sm">
+        <div className="relative p-6 md:p-8">
+          <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-[#d4af37]/10 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-slate-100 blur-3xl" />
 
-        <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}`}>Overview</Link>
-          </Button>
-
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}/audit`}>Audit</Link>
-          </Button>
-
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}/keywords`}>
-              Keywords
-            </Link>
-          </Button>
-
-          <Button asChild>
-            <Link href={`/dashboard/projects/${project.id}/reports`}>
-              Report
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      <section className="overflow-hidden rounded-[2rem] border bg-white shadow-sm">
-        <div className="relative p-8">
-          <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-rose-100 blur-3xl" />
-          <div className="absolute right-32 top-10 h-40 w-40 rounded-full bg-blue-100 blur-3xl" />
-          <div className="absolute bottom-0 left-1/2 h-36 w-36 rounded-full bg-emerald-100 blur-3xl" />
-
-          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-5">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  {project.domain}
-                </p>
-                <h1 className="mt-2 max-w-3xl text-4xl font-bold tracking-tight">
-                  Fix the highest-impact SEO items first.
-                </h1>
-              </div>
-
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                This page turns the latest audit issues and Google Search Console
-                keyword data into a focused action plan. Start with blockers,
-                then improve keywords that already have visibility.
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+                SEO Recommendations
               </p>
 
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
-                  {highIssues.length} high priority
-                </span>
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                  {mediumIssues.length} medium priority
-                </span>
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                  {keywordRecommendations.length} keyword actions
-                </span>
-              </div>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                Action Plan for {project.name}
+              </h1>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Prioritized recommendations based on the latest SEO audit issues
+                and Google Search Console keyword data for{" "}
+                {normalizeDomainForDisplay(project.domain)}.
+              </p>
             </div>
 
-            <Card className="border-slate-200 bg-background/90 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Latest Data</CardTitle>
-              </CardHeader>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/projects/${project.id}`}>Overview</Link>
+              </Button>
 
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Audit Score</span>
-                  <span className="font-medium">
-                    {latestAudit?.score ?? "--"}
-                  </span>
-                </div>
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/projects/${project.id}/audit`}>
+                  Run Audit
+                </Link>
+              </Button>
 
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Audit Status</span>
-                  <span className="font-medium capitalize">
-                    {latestAudit?.status || "No audit yet"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Latest Audit</span>
-                  <span className="font-medium">
-                    {formatDate(latestAudit?.created_at)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Keyword Data</span>
-                  <span className="font-medium">{latestKeywordDate}</span>
-                </div>
-              </CardContent>
-            </Card>
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/projects/${project.id}/reports`}>
+                  View Report
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-4">
         {[
           {
+            label: "Total Actions",
+            value: recommendations.length,
+            helper: "Recommended next steps",
+            className: "border-[#e6dcc8] bg-white",
+          },
+          {
             label: "High Priority",
-            value: highIssues.length,
-            helper: "Fix these first",
-            className: "border-rose-200 bg-rose-50",
+            value: highCount,
+            helper: "Fix first",
+            className: "border-red-200 bg-red-50",
           },
           {
             label: "Medium Priority",
-            value: mediumIssues.length,
+            value: mediumCount,
             helper: "Review next",
-            className: "border-amber-200 bg-amber-50",
+            className: "border-[#d4af37]/50 bg-[#fff8df]",
           },
           {
-            label: "Keyword Actions",
-            value: keywordRecommendations.length,
-            helper: "GSC opportunities",
-            className: "border-blue-200 bg-blue-50",
-          },
-          {
-            label: "Search Visibility",
-            value: formatNumber(totalImpressions),
-            helper: `${formatNumber(totalClicks)} clicks`,
-            className: "border-emerald-200 bg-emerald-50",
+            label: "Low Priority",
+            value: lowCount,
+            helper: "Cleanup items",
+            className: "border-[#e6dcc8] bg-[#faf7ef]",
           },
         ].map((item) => (
-          <Card key={item.label} className={`shadow-sm ${item.className}`}>
+          <Card
+            key={item.label}
+            className={`rounded-2xl shadow-sm ${item.className}`}
+          >
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{item.label}</CardTitle>
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {item.label}
+              </CardTitle>
             </CardHeader>
+
             <CardContent>
-              <p className="text-4xl font-bold tracking-tight">{item.value}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {item.helper}
+              <p className="text-4xl font-bold tracking-tight text-slate-950">
+                {item.value}
               </p>
+              <p className="mt-1 text-sm text-slate-500">{item.helper}</p>
             </CardContent>
           </Card>
         ))}
       </section>
 
-      {!hasAnyData ? (
-        <Card className="border-dashed bg-slate-50 shadow-sm">
-          <CardContent className="flex min-h-[340px] flex-col items-center justify-center p-10 text-center">
-            <div className="rounded-full border bg-white px-4 py-2 text-sm font-medium text-muted-foreground">
-              No recommendations yet
+      {recommendations.length === 0 ? (
+        <Card className="rounded-3xl border-dashed border-[#d4af37]/50 bg-[#faf7ef] shadow-sm">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#d4af37]/40 bg-white text-lg font-bold text-[#9a7a19]">
+              ✓
             </div>
 
-            <h3 className="mt-5 text-2xl font-bold tracking-tight">
-              Run an audit and sync keyword data first
-            </h3>
+            <h2 className="mt-4 text-xl font-bold text-slate-950">
+              No recommendations yet
+            </h2>
 
-            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Recommendations will appear after the project has audit issues or
-              Google Search Console keyword rows.
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+              Run an SEO audit and sync Google Search Console keyword data first.
+              Once data is available, this page will show prioritized technical
+              fixes, CTR opportunities, and keyword actions.
             </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -631,268 +492,79 @@ export default async function RecommendationsPage({
           </CardContent>
         </Card>
       ) : (
-        <>
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Recommended Action Plan</CardTitle>
-            </CardHeader>
+        <section className="grid gap-4">
+          {recommendations.map((item, index) => (
+            <Card
+              key={item.id}
+              className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm"
+            >
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-3 py-1 text-xs font-semibold text-slate-600">
+                        #{index + 1}
+                      </span>
 
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-sm font-bold text-rose-700">
-                      1
-                    </span>
-                    <p className="text-sm font-semibold">
-                      Fix SEO blockers first
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPriorityClass(
+                          item.priority
+                        )}`}
+                      >
+                        {item.priority} Priority
+                      </span>
+
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getCategoryClass(
+                          item.category
+                        )}`}
+                      >
+                        {item.category}
+                      </span>
+                    </div>
+
+                    <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
+                      {item.title}
+                    </h2>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      {item.description}
                     </p>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    Start with high and medium audit issues because they can
-                    affect crawlability, metadata quality, and page relevance.
-                  </p>
-                </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700">
-                      2
-                    </span>
-                    <p className="text-sm font-semibold">
-                      Improve close-ranking keywords
-                    </p>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    Focus on keywords in positions 4–15 because these are
-                    usually the fastest opportunities to move.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 text-sm font-bold text-amber-700">
-                      3
-                    </span>
-                    <p className="text-sm font-semibold">
-                      Rewrite weak snippets
-                    </p>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    For keywords with impressions but low clicks, improve the
-                    title tag and meta description to increase CTR.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm font-bold text-emerald-700">
-                      4
-                    </span>
-                    <p className="text-sm font-semibold">
-                      Rerun audit after updates
-                    </p>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    After applying fixes, run another audit and compare keyword
-                    movement in the next Search Console sync.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <CardTitle>SEO Issue Recommendations</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Audit findings sorted by severity.
-                  </p>
-                </div>
-
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/dashboard/projects/${project.id}/audit`}>
-                    Run New Audit
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-
-            <CardContent>
-              {topIssues.length === 0 ? (
-                <div className="rounded-2xl border border-dashed bg-slate-50 p-8 text-center">
-                  <p className="text-sm font-medium">No SEO issues found.</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    The latest audit did not return issue recommendations.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {topIssues.map((issue) => (
-                    <div
-                      key={issue.id}
-                      className="rounded-2xl border bg-white p-5 shadow-sm"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="max-w-3xl">
-                          <h3 className="text-base font-semibold">
-                            {issue.title}
-                          </h3>
-
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {issue.description || "No description available."}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-medium ${getSeverityClass(
-                              issue.severity
-                            )}`}
-                          >
-                            {getSeverityLabel(issue.severity)}
-                          </span>
-
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${getCategoryClass(
-                              issue.category
-                            )}`}
-                          >
-                            {issue.category || "general"}
-                          </span>
-                        </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Why this matters
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {item.impact}
+                        </p>
                       </div>
 
-                      <div className="mt-4 rounded-xl bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Recommended Fix
+                      <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
+                          Recommended action
                         </p>
-
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {issue.recommendation ||
-                            "Review this issue and apply the appropriate SEO fix."}
+                        <p className="mt-2 text-sm leading-6 text-[#7a5b00]/80">
+                          {item.action}
                         </p>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4 lg:w-56">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Source
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-950">
+                      {item.source}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <CardTitle>Keyword Recommendations</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Opportunities from the latest Google Search Console sync.
-                  </p>
-                </div>
-
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/dashboard/projects/${project.id}/keywords`}>
-                    View Keywords
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-
-            <CardContent>
-              {keywordRecommendations.length === 0 ? (
-                <div className="rounded-2xl border border-dashed bg-slate-50 p-8 text-center">
-                  <p className="text-sm font-medium">
-                    No keyword recommendations found.
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Sync Google Search Console data or wait for more impressions.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {keywordRecommendations.map((keyword) => (
-                    <div
-                      key={keyword.id}
-                      className="rounded-2xl border bg-white p-5 shadow-sm"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="max-w-3xl">
-                          <h3 className="text-base font-semibold">
-                            {keyword.query}
-                          </h3>
-
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {keyword.action}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-medium ${getPriorityClass(
-                              keyword.priority
-                            )}`}
-                          >
-                            {keyword.priority}
-                          </span>
-
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-medium ${getIntentClass(
-                              keyword.intent
-                            )}`}
-                          >
-                            {keyword.intent}
-                          </span>
-
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                            {keyword.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">
-                            Impressions
-                          </p>
-                          <p className="mt-1 font-semibold">
-                            {formatNumber(keyword.impressions)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">
-                            Clicks
-                          </p>
-                          <p className="mt-1 font-semibold">
-                            {formatNumber(keyword.clicks)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">CTR</p>
-                          <p className="mt-1 font-semibold">
-                            {formatCtr(keyword.ctr)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs text-muted-foreground">
-                            Position
-                          </p>
-                          <p className="mt-1 font-semibold">
-                            {formatPosition(keyword.position)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
       )}
     </div>
   );
