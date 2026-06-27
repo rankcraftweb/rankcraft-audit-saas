@@ -59,7 +59,7 @@ export default async function DashboardLayout({
           className="hidden w-72 shrink-0 border-r border-[#2a2417] bg-[#111111] text-white lg:flex lg:flex-col"
         >
           <div className="border-b border-white/10 p-5">
-            <Link href="/dashboard" className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-sm font-bold text-[#f5d56a]">
                 RC
               </div>
@@ -120,15 +120,15 @@ export default async function DashboardLayout({
             <div className="flex min-h-16 items-center justify-between gap-4 px-4 py-3 md:px-6">
               <div className="flex items-center gap-3 lg:hidden">
                 <Link
-                  href="/dashboard"
+                  href="/"
                   className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#111111] text-xs font-bold text-[#f5d56a]"
                 >
                   RC
                 </Link>
 
-                <p className="text-sm font-bold text-slate-950">
+                <Link href="/" className="text-sm font-bold text-slate-950">
                   RankCraft Audit
-                </p>
+                </Link>
               </div>
 
               <div className="hidden lg:block" />
