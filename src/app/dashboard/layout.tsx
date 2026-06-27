@@ -42,7 +42,7 @@ export default async function DashboardLayout({
       href: "/dashboard",
     },
     {
-      label: "Projects",
+      label: "SEO Audit",
       href: "/dashboard/projects",
     },
     {
