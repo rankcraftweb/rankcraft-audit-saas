@@ -1,6 +1,8 @@
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PrintReportButton from "@/components/print-report-button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,6 +22,14 @@ type ReportsPageProps = {
   params: Promise<{
     id: string;
   }>;
+};
+
+type Project = {
+  id: string;
+  name: string;
+  domain: string;
+  created_at: string;
+  user_id: string;
 };
 
 type AuditIssue = {
@@ -275,22 +285,33 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
 
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("id, name, domain, created_at")
+    .select("id, name, domain, created_at, user_id")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (projectError || !project) {
     notFound();
   }
 
+  const currentProject = project as Project;
+
   const { data: latestPageSpeedReport } = await supabase
     .from("pagespeed_reports")
     .select(
       "id, performance_score, accessibility_score, best_practices_score, seo_score, created_at"
     )
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -298,7 +319,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
   const { data: latestAudit } = await supabase
     .from("audits")
     .select("id, score, status, created_at")
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -318,7 +339,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
     .select(
       "id, query, clicks, impressions, ctr, position, start_date, end_date, created_at"
     )
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -515,21 +536,47 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         `}
       </style>
 
-      <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9a7a19]">
-            Client Report
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">
-            Reports
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Compact SEO report for export or print.
-          </p>
-        </div>
+      <section className="no-print rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/projects/${currentProject.id}`}>
+                ← Back to Overview
+              </Link>
+            </Button>
 
-        <PrintReportButton />
-      </div>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Report
+            </p>
+
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+              Client-ready SEO report
+            </h1>
+
+            <p className="mt-2 text-sm text-slate-500">
+              {currentProject.name} ·{" "}
+              {normalizeDomainForDisplay(currentProject.domain)}
+            </p>
+
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              Review the compact report, then export or print it without the app
+              sidebar, header, and action buttons.
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+            <PrintReportButton />
+
+            <Button asChild variant="outline">
+              <Link
+                href={`/dashboard/projects/${currentProject.id}/recommendations`}
+              >
+                Recommendations
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
 
       <div className="print-report space-y-4">
         <section className="print-avoid rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm">
@@ -544,11 +591,11 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
               </h1>
 
               <p className="mt-2 text-base font-semibold text-slate-950">
-                {project.name}
+                {currentProject.name}
               </p>
 
               <p className="text-sm text-slate-500">
-                {normalizeDomainForDisplay(project.domain)}
+                {normalizeDomainForDisplay(currentProject.domain)}
               </p>
 
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
@@ -562,6 +609,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
                     Overall SEO Score
                   </p>
+
                   <p className="print-score mt-2 text-5xl font-bold tracking-tight text-white">
                     {seoScore ?? "--"}
                   </p>
@@ -603,6 +651,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         <section className="print-section space-y-3">
           <div>
             <h2 className="text-xl font-bold text-slate-950">Score Overview</h2>
+
             <p className="text-sm text-slate-500">
               Latest audit and PageSpeed summary.
             </p>
@@ -662,6 +711,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         <section className="print-avoid grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
             <h3 className="font-semibold text-slate-950">Executive Summary</h3>
+
             <p className="mt-2 text-sm leading-6 text-slate-500">
               {getOverallSummary(seoScore, issueCount, keywordList.length)}
             </p>
@@ -671,6 +721,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             <h3 className="font-semibold text-[#7a5b00]">
               Recommended Focus
             </h3>
+
             <p className="mt-2 text-sm leading-6 text-[#7a5b00]/80">
               Fix high and medium SEO issues first, improve keywords with
               impressions but weak clicks, then monitor ranking movement after
@@ -684,6 +735,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
             <h2 className="text-xl font-bold text-slate-950">
               Visibility & Issues
             </h2>
+
             <p className="text-sm text-slate-500">
               Keyword visibility and latest SEO issue summary.
             </p>
@@ -726,6 +778,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   <p className="print-score text-3xl font-bold tracking-tight text-slate-950">
                     {item.value}
                   </p>
+
                   <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
                 </CardContent>
               </Card>
@@ -773,6 +826,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   <p className="print-score text-3xl font-bold tracking-tight text-slate-950">
                     {item.value}
                   </p>
+
                   <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
                 </CardContent>
               </Card>
@@ -811,6 +865,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                   <p className="print-score text-3xl font-bold tracking-tight text-slate-950">
                     {item.value}
                   </p>
+
                   <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
                 </CardContent>
               </Card>
@@ -819,9 +874,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         </section>
 
         <section className="print-avoid rounded-2xl border border-[#e6dcc8] bg-white p-4 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-950">
-            Action Plan
-          </h2>
+          <h2 className="text-xl font-bold text-slate-950">Action Plan</h2>
 
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {[
@@ -851,6 +904,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                 className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-3"
               >
                 <p className="font-semibold text-slate-950">{item.title}</p>
+
                 <p className="mt-1 text-sm leading-5 text-slate-500">
                   {item.description}
                 </p>
@@ -886,6 +940,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
                           <p className="font-semibold text-slate-950">
                             {issue.title}
                           </p>
+
                           <p className="mt-1 text-sm leading-5 text-slate-500">
                             {issue.description || "No description available."}
                           </p>
@@ -979,9 +1034,9 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
         <footer className="print-footer hidden">
           <p className="text-xs text-slate-500">
             Generated by RankCraft Audit for{" "}
-            {normalizeDomainForDisplay(project.domain)}. Based on the latest
-            available audit, PageSpeed data, and Google Search Console keyword
-            sync.
+            {normalizeDomainForDisplay(currentProject.domain)}. Based on the
+            latest available audit, PageSpeed data, and Google Search Console
+            keyword sync.
           </p>
         </footer>
       </div>
