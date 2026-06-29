@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,14 @@ type RecommendationsPageProps = {
   params: Promise<{
     id: string;
   }>;
+};
+
+type Project = {
+  id: string;
+  name: string;
+  domain: string;
+  created_at: string;
+  user_id: string;
 };
 
 type AuditIssue = {
@@ -213,7 +221,9 @@ function getKeywordPriority(keyword: GscKeywordRow): "High" | "Medium" | "Low" {
   return "Low";
 }
 
-function getIssuePriority(severity: string | null | undefined): "High" | "Medium" | "Low" {
+function getIssuePriority(
+  severity: string | null | undefined
+): "High" | "Medium" | "Low" {
   if (severity === "high") {
     return "High";
   }
@@ -232,7 +242,8 @@ function buildIssueRecommendations(issues: AuditIssue[]) {
     return {
       id: `issue-${issue.id}`,
       title: issue.title,
-      description: issue.description || "This SEO issue was detected in the latest audit.",
+      description:
+        issue.description || "This SEO issue was detected in the latest audit.",
       priority,
       category: issue.category || "Technical SEO",
       impact:
@@ -306,20 +317,31 @@ export default async function RecommendationsPage({
 
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("id, name, domain, created_at")
+    .select("id, name, domain, created_at, user_id")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (projectError || !project) {
     notFound();
   }
 
+  const currentProject = project as Project;
+
   const { data: latestAudit } = await supabase
     .from("audits")
     .select("id, score, status, created_at")
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -339,7 +361,7 @@ export default async function RecommendationsPage({
     .select(
       "id, query, clicks, impressions, ctr, position, start_date, end_date, created_at"
     )
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -355,137 +377,161 @@ export default async function RecommendationsPage({
     ...keywordRecommendations,
   ]).slice(0, 12);
 
-  const highCount = recommendations.filter(
-    (item) => item.priority === "High"
-  ).length;
+  const highCount = recommendations.filter((item) => {
+    return item.priority === "High";
+  }).length;
 
-  const mediumCount = recommendations.filter(
-    (item) => item.priority === "Medium"
-  ).length;
+  const mediumCount = recommendations.filter((item) => {
+    return item.priority === "Medium";
+  }).length;
 
-  const lowCount = recommendations.filter(
-    (item) => item.priority === "Low"
-  ).length;
+  const lowCount = recommendations.filter((item) => {
+    return item.priority === "Low";
+  }).length;
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-3xl border border-[#e6dcc8] bg-white shadow-sm">
-        <div className="relative p-6 md:p-8">
-          <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-[#d4af37]/10 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-slate-100 blur-3xl" />
+      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/projects/${currentProject.id}`}>
+                ← Back to Overview
+              </Link>
+            </Button>
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-                SEO Recommendations
-              </p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Recommendations
+            </p>
 
-              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-                Action Plan for {project.name}
-              </h1>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+              Prioritized action plan
+            </h1>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Prioritized recommendations based on the latest SEO audit issues
-                and Google Search Console keyword data for{" "}
-                {normalizeDomainForDisplay(project.domain)}.
-              </p>
-            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              {currentProject.name} ·{" "}
+              {normalizeDomainForDisplay(currentProject.domain)}
+            </p>
 
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}`}>Overview</Link>
-              </Button>
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              Review the highest-impact next actions based on the latest audit
+              issues and Google Search Console keyword data.
+            </p>
+          </div>
 
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}/audit`}>
-                  Run Audit
-                </Link>
-              </Button>
+          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+            <Button asChild>
+              <Link href={`/dashboard/projects/${currentProject.id}/reports`}>
+                Report
+              </Link>
+            </Button>
 
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}/reports`}>
-                  View Report
-                </Link>
-              </Button>
-            </div>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${currentProject.id}/audit`}>
+                Run Audit
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-4">
-        {[
-          {
-            label: "Total Actions",
-            value: recommendations.length,
-            helper: "Recommended next steps",
-            className: "border-[#e6dcc8] bg-white",
-          },
-          {
-            label: "High Priority",
-            value: highCount,
-            helper: "Fix first",
-            className: "border-red-200 bg-red-50",
-          },
-          {
-            label: "Medium Priority",
-            value: mediumCount,
-            helper: "Review next",
-            className: "border-[#d4af37]/50 bg-[#fff8df]",
-          },
-          {
-            label: "Low Priority",
-            value: lowCount,
-            helper: "Cleanup items",
-            className: "border-[#e6dcc8] bg-[#faf7ef]",
-          },
-        ].map((item) => (
-          <Card
-            key={item.label}
-            className={`rounded-2xl shadow-sm ${item.className}`}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                {item.label}
-              </CardTitle>
-            </CardHeader>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Total Actions
+            </CardTitle>
+          </CardHeader>
 
-            <CardContent>
-              <p className="text-4xl font-bold tracking-tight text-slate-950">
-                {item.value}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">{item.helper}</p>
-            </CardContent>
-          </Card>
-        ))}
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {recommendations.length}
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Recommended next steps
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-red-200 bg-red-50 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-red-700">
+              High Priority
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {highCount}
+            </p>
+
+            <p className="mt-1 text-sm text-red-700/80">Fix first</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#d4af37]/50 bg-[#fff8df] shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
+              Medium Priority
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {mediumCount}
+            </p>
+
+            <p className="mt-1 text-sm text-[#7a5b00]/80">Review next</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#e6dcc8] bg-[#faf7ef] shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Low Priority
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {lowCount}
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">Cleanup items</p>
+          </CardContent>
+        </Card>
       </section>
 
       {recommendations.length === 0 ? (
-        <Card className="rounded-3xl border-dashed border-[#d4af37]/50 bg-[#faf7ef] shadow-sm">
-          <CardContent className="p-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#d4af37]/40 bg-white text-lg font-bold text-[#9a7a19]">
+        <Card className="rounded-3xl border-dashed border-[#d4af37]/50 bg-white shadow-sm">
+          <CardContent className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#111111] text-lg font-bold text-[#d4af37]">
               ✓
             </div>
 
-            <h2 className="mt-4 text-xl font-bold text-slate-950">
+            <h2 className="mt-5 text-xl font-bold tracking-tight text-slate-950">
               No recommendations yet
             </h2>
 
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
-              Run an SEO audit and sync Google Search Console keyword data first.
-              Once data is available, this page will show prioritized technical
-              fixes, CTR opportunities, and keyword actions.
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+              Run an SEO audit and sync Google Search Console keyword data
+              first. Once data is available, this page will show prioritized
+              technical fixes, CTR opportunities, and keyword actions.
             </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button asChild>
-                <Link href={`/dashboard/projects/${project.id}/audit`}>
+                <Link href={`/dashboard/projects/${currentProject.id}/audit`}>
                   Run Audit
                 </Link>
               </Button>
 
               <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}/keywords`}>
-                  View Keywords
+                <Link
+                  href={`/dashboard/projects/${currentProject.id}/keywords`}
+                >
+                  Keywords
                 </Link>
               </Button>
             </div>
@@ -498,8 +544,8 @@ export default async function RecommendationsPage({
               key={item.id}
               className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm"
             >
-              <CardContent className="p-5">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <CardContent className="p-5 md:p-6">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-3 py-1 text-xs font-semibold text-slate-600">
@@ -511,7 +557,7 @@ export default async function RecommendationsPage({
                           item.priority
                         )}`}
                       >
-                        {item.priority} Priority
+                        {item.priority}
                       </span>
 
                       <span
@@ -536,6 +582,7 @@ export default async function RecommendationsPage({
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                           Why this matters
                         </p>
+
                         <p className="mt-2 text-sm leading-6 text-slate-600">
                           {item.impact}
                         </p>
@@ -545,6 +592,7 @@ export default async function RecommendationsPage({
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
                           Recommended action
                         </p>
+
                         <p className="mt-2 text-sm leading-6 text-[#7a5b00]/80">
                           {item.action}
                         </p>
@@ -552,10 +600,11 @@ export default async function RecommendationsPage({
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4 lg:w-56">
+                  <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4 xl:w-56">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       Source
                     </p>
+
                     <p className="mt-2 text-sm font-semibold text-slate-950">
                       {item.source}
                     </p>
