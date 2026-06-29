@@ -1,96 +1,78 @@
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-type ProjectPageProps = {
+type PageProps = {
   params: Promise<{
     id: string;
   }>;
 };
 
-type AuditIssue = {
+type Project = {
   id: string;
-  title: string;
-  description: string | null;
-  severity: string | null;
-  category: string | null;
-  recommendation: string | null;
+  name: string;
+  domain: string;
   created_at: string;
+  user_id: string;
 };
 
-type Keyword = {
+type AuditRow = {
   id: string;
-  query: string;
+  project_id: string;
+  score: number | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+type KeywordRow = {
+  id: string;
+  project_id: string;
+  query?: string | null;
+  page?: string | null;
   clicks: number | null;
   impressions: number | null;
   ctr: number | null;
   position: number | null;
-  date: string | null;
+  created_at: string | null;
 };
 
-function formatNumber(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return "--";
-  }
-
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatDate(date: string | null | undefined) {
-  if (!date) {
-    return "--";
-  }
-
-  return new Date(date).toLocaleString();
-}
-
-function formatShortDate(date: string | null | undefined) {
-  if (!date) {
-    return "--";
-  }
-
-  return new Date(date).toLocaleDateString();
-}
-
-function formatCtr(ctr: number | null | undefined) {
-  if (ctr === null || ctr === undefined) {
-    return "--";
-  }
-
-  return `${(Number(ctr) * 100).toFixed(2)}%`;
-}
-
-function formatPosition(position: number | null | undefined) {
-  if (position === null || position === undefined) {
-    return "--";
-  }
-
-  return Number(position).toFixed(1);
-}
-
-function normalizeDomainForDisplay(domain: string) {
+function normalizeDomain(domain: string) {
   return domain
     .replace("https://", "")
     .replace("http://", "")
     .replace(/\/$/, "");
 }
 
+function formatDate(date: string | null | undefined) {
+  if (!date) {
+    return "No scan yet";
+  }
+
+  return new Date(date).toLocaleDateString();
+}
+
+function formatNumber(value: number | null | undefined) {
+  return Number(value || 0).toLocaleString();
+}
+
+function formatPosition(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "--";
+  }
+
+  return Number(value).toFixed(1);
+}
+
 function getScoreLabel(score: number | null | undefined) {
   if (score === null || score === undefined) {
-    return "No scan";
+    return "Not scanned";
   }
 
   if (score >= 90) {
@@ -98,13 +80,13 @@ function getScoreLabel(score: number | null | undefined) {
   }
 
   if (score >= 70) {
-    return "Needs work";
+    return "Needs improvement";
   }
 
-  return "Attention";
+  return "Needs attention";
 }
 
-function getScoreBadgeClass(score: number | null | undefined) {
+function getScoreClass(score: number | null | undefined) {
   if (score === null || score === undefined) {
     return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
@@ -114,155 +96,63 @@ function getScoreBadgeClass(score: number | null | undefined) {
   }
 
   if (score >= 70) {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
   return "border-red-200 bg-red-50 text-red-700";
 }
 
-function getSeverityBadgeClass(severity: string | null | undefined) {
-  if (severity === "high") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  if (severity === "medium") {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
-  }
-
-  if (severity === "low") {
-    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
-  }
-
-  return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
-}
-
-function getKeywordStatus(keyword: Keyword) {
-  const impressions = keyword.impressions || 0;
-  const clicks = keyword.clicks || 0;
-  const ctr = keyword.ctr || 0;
-  const position = Number(keyword.position || 0);
-
-  if (position > 0 && position <= 3) {
-    return "Top 3";
-  }
-
-  if (position > 3 && position <= 10) {
-    return "Page 1";
-  }
-
-  if (position > 10 && position <= 20) {
-    return "Near Page 1";
-  }
-
-  if (impressions >= 5 && clicks === 0) {
-    return "Low CTR";
-  }
-
-  if (ctr < 0.02 && impressions >= 5) {
-    return "CTR Gap";
-  }
-
-  return "Monitor";
-}
-
-function getProjectHealthSummary(
-  seoScore: number | null | undefined,
-  issueCount: number,
-  keywordCount: number
-) {
-  if (seoScore === null || seoScore === undefined) {
-    return "Run the first audit to generate SEO, performance, and issue data for this project.";
-  }
-
-  if (seoScore >= 90 && issueCount <= 2 && keywordCount > 0) {
-    return "Strong technical foundation with active keyword visibility data.";
-  }
-
-  if (seoScore >= 70) {
-    return "Solid foundation with SEO improvements and keyword opportunities to review.";
-  }
-
-  return "Needs technical SEO attention before scaling content, rankings, or reporting.";
-}
-
-export default async function ProjectPage({ params }: ProjectPageProps) {
+export default async function ProjectOverviewPage({ params }: PageProps) {
   const { id } = await params;
 
   const supabase = await createClient();
 
-  const { data: project, error: projectError } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: project } = await supabase
     .from("projects")
-    .select("id, name, domain, created_at")
+    .select("id, name, domain, created_at, user_id")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
-  if (projectError || !project) {
+  if (!project) {
     notFound();
   }
 
-  const { data: latestPageSpeedReport } = await supabase
-    .from("pagespeed_reports")
-    .select(
-      "id, performance_score, accessibility_score, best_practices_score, seo_score, created_at"
-    )
-    .eq("project_id", project.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const currentProject = project as Project;
 
-  const { data: latestAudit } = await supabase
+  const { data: audits } = await supabase
     .from("audits")
-    .select("id, score, status, created_at")
-    .eq("project_id", project.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .select("id, project_id, score, status, created_at")
+    .eq("project_id", currentProject.id)
+    .order("created_at", { ascending: false });
 
-  const { data: issues } = latestAudit?.id
-    ? await supabase
-        .from("audit_issues")
-        .select(
-          "id, title, description, severity, category, recommendation, created_at"
-        )
-        .eq("audit_id", latestAudit.id)
-        .order("created_at", { ascending: true })
-    : { data: [] };
+  const auditList = (audits || []) as AuditRow[];
+  const latestAudit = auditList[0] || null;
 
-  const { data: keywords } = await supabase
-    .from("keywords")
-    .select("id, query, clicks, impressions, ctr, position, date")
-    .eq("project_id", project.id)
-    .order("impressions", { ascending: false });
+  const { data: keywordRows } = await supabase
+    .from("gsc_keyword_rows")
+    .select("id, project_id, query, page, clicks, impressions, ctr, position, created_at")
+    .eq("project_id", currentProject.id)
+    .order("impressions", { ascending: false })
+    .limit(5);
 
-  const issueList = (issues || []) as AuditIssue[];
-  const keywordList = (keywords || []) as Keyword[];
-
-  const seoScore = latestPageSpeedReport?.seo_score ?? latestAudit?.score;
-  const performanceScore = latestPageSpeedReport?.performance_score;
-  const accessibilityScore = latestPageSpeedReport?.accessibility_score;
-  const bestPracticesScore = latestPageSpeedReport?.best_practices_score;
-
-  const issueCount = issueList.length;
-  const keywordCount = keywordList.length;
-
-  const highIssues = issueList.filter((issue) => issue.severity === "high")
-    .length;
-
-  const mediumIssues = issueList.filter((issue) => issue.severity === "medium")
-    .length;
-
-  const lowIssues = issueList.filter((issue) => issue.severity === "low").length;
+  const keywordList = (keywordRows || []) as KeywordRow[];
 
   const totalClicks = keywordList.reduce((sum, keyword) => {
-    return sum + (keyword.clicks || 0);
+    return sum + Number(keyword.clicks || 0);
   }, 0);
 
   const totalImpressions = keywordList.reduce((sum, keyword) => {
-    return sum + (keyword.impressions || 0);
+    return sum + Number(keyword.impressions || 0);
   }, 0);
-
-  const averageCtr =
-    totalImpressions > 0 ? totalClicks / totalImpressions : null;
 
   const averagePosition =
     keywordList.length > 0
@@ -271,461 +161,228 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         }, 0) / keywordList.length
       : null;
 
-  const pageOneKeywords = keywordList.filter((keyword) => {
-    const position = Number(keyword.position || 0);
-    return position > 0 && position <= 10;
-  });
-
-  const nearPageOneKeywords = keywordList.filter((keyword) => {
-    const position = Number(keyword.position || 0);
-    return position > 10 && position <= 20;
-  });
-
-  const lowCtrKeywords = keywordList.filter((keyword) => {
-    const impressions = keyword.impressions || 0;
-    const clicks = keyword.clicks || 0;
-    const ctr = keyword.ctr || 0;
-
-    return impressions >= 5 && (clicks === 0 || ctr < 0.02);
-  });
-
-  const topIssues = issueList.slice(0, 5);
-  const topKeywords = keywordList.slice(0, 6);
-
-  const latestKeywordDate = keywordList[0]?.date
-    ? formatShortDate(keywordList[0].date)
-    : "No keyword data yet";
-
-  const latestScanDate =
-    latestAudit?.created_at || latestPageSpeedReport?.created_at || null;
-
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
-        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-          <div className="max-w-3xl space-y-3">
-            <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
-              Project Overview
-            </div>
+      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/projects">← Back to SEO Audit</Link>
+            </Button>
 
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
-                {project.name}
-              </h1>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Overview
+            </p>
 
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                {normalizeDomainForDisplay(project.domain)}
-              </p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+              {currentProject.name}
+            </h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                {getProjectHealthSummary(seoScore, issueCount, keywordCount)}
-              </p>
-            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              {normalizeDomain(currentProject.domain)}
+            </p>
+
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              Review the current audit status, keyword data, and next actions
+              for this website.
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] p-4 text-white">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
-                  SEO Score
-                </p>
-                <p className="mt-2 text-4xl font-bold tracking-tight text-white">
-                  {seoScore ?? "--"}
-                </p>
-              </div>
+          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+            <Button asChild>
+              <Link href={`/dashboard/projects/${currentProject.id}/audit`}>
+                Run Audit
+              </Link>
+            </Button>
 
-              <span
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreBadgeClass(
-                  seoScore
-                )}`}
-              >
-                {getScoreLabel(seoScore)}
-              </span>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {[
-                {
-                  label: "Issues",
-                  value: issueCount,
-                },
-                {
-                  label: "Keywords",
-                  value: keywordCount,
-                },
-                {
-                  label: "Clicks",
-                  value: formatNumber(totalClicks),
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-xl border border-white/10 bg-white/10 p-3"
-                >
-                  <p className="text-[11px] text-slate-400">{item.label}</p>
-                  <p className="mt-1 text-lg font-bold text-white">
-                    {item.value}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${currentProject.id}/reports`}>
+                Report
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        {[
-          {
-            label: "SEO Score",
-            value: seoScore ?? "--",
-            helper: getScoreLabel(seoScore),
-          },
-          {
-            label: "Performance",
-            value: performanceScore ?? "--",
-            helper: getScoreLabel(performanceScore),
-          },
-          {
-            label: "Open Issues",
-            value: issueCount,
-            helper: `${highIssues} high · ${mediumIssues} medium · ${lowIssues} low`,
-          },
-          {
-            label: "Keywords",
-            value: keywordCount,
-            helper: "Imported from GSC.",
-          },
-        ].map((item) => (
-          <Card
-            key={item.label}
-            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {item.label}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-3xl font-bold tracking-tight text-slate-950">
-                {item.value}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        {[
-          {
-            label: "Impressions",
-            value: formatNumber(totalImpressions),
-            helper: "Search visibility.",
-          },
-          {
-            label: "Average CTR",
-            value: formatCtr(averageCtr),
-            helper: "Click-through rate.",
-          },
-          {
-            label: "Avg. Position",
-            value: formatPosition(averagePosition),
-            helper: "Lower is better.",
-          },
-          {
-            label: "Page 1 Keywords",
-            value: pageOneKeywords.length,
-            helper: "Positions 1–10.",
-          },
-        ].map((item) => (
-          <Card
-            key={item.label}
-            className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {item.label}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-3xl font-bold tracking-tight text-slate-950">
-                {item.value}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base text-slate-950">
-              Project Snapshot
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              SEO Score
             </CardTitle>
-            <p className="text-sm text-slate-500">
-              Latest scan and keyword data status.
-            </p>
           </CardHeader>
 
           <CardContent>
-            <div className="space-y-3">
-              {[
-                {
-                  label: "Domain",
-                  value: normalizeDomainForDisplay(project.domain),
-                },
-                {
-                  label: "Latest Audit",
-                  value: formatDate(latestScanDate),
-                },
-                {
-                  label: "Keyword Data",
-                  value: latestKeywordDate,
-                },
-                {
-                  label: "Accessibility",
-                  value: accessibilityScore ?? "--",
-                },
-                {
-                  label: "Best Practices",
-                  value: bestPracticesScore ?? "--",
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between gap-4 rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4"
-                >
-                  <span className="text-sm text-slate-500">{item.label}</span>
-                  <span className="text-right text-sm font-semibold text-slate-950">
-                    {item.value}
-                  </span>
-                </div>
-              ))}
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {latestAudit?.score ?? "--"}
+            </p>
+
+            <span
+              className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getScoreClass(
+                latestAudit?.score
+              )}`}
+            >
+              {getScoreLabel(latestAudit?.score)}
+            </span>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#d4af37]/40 bg-[#fff8df] shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+              Last Audit
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-2xl font-bold tracking-tight text-slate-950">
+              {formatDate(latestAudit?.created_at)}
+            </p>
+
+            <p className="mt-2 text-sm text-[#7a5b00]/80">
+              {latestAudit ? "Audit data available" : "Run your first audit"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Impressions
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {formatNumber(totalImpressions)}
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              From latest keyword rows
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Avg. Position
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {formatPosition(averagePosition)}
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Based on visible keyword data
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
+        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="flex flex-col gap-4 border-b border-[#eee5d4] p-5 md:flex-row md:items-center md:justify-between md:p-6">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+                Workflow
+              </p>
+
+              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                Continue audit work
+              </CardTitle>
+            </div>
+          </CardHeader>
+
+          <CardContent className="grid gap-3 p-5 md:grid-cols-2 md:p-6">
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/audit`}
+              className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-5 transition hover:border-[#d4af37]/60 hover:bg-[#fff8df]"
+            >
+              <p className="text-sm font-bold text-slate-950">Run Audit</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Scan the website for technical SEO issues and generate a score.
+              </p>
+            </Link>
+
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/keywords`}
+              className="rounded-2xl border border-[#e6dcc8] bg-white p-5 transition hover:border-[#d4af37]/60 hover:bg-[#fff8df]"
+            >
+              <p className="text-sm font-bold text-slate-950">Keywords</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Review Google Search Console keyword rows and search visibility.
+              </p>
+            </Link>
+
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/reports`}
+              className="rounded-2xl border border-[#e6dcc8] bg-white p-5 transition hover:border-[#d4af37]/60 hover:bg-[#fff8df]"
+            >
+              <p className="text-sm font-bold text-slate-950">Report</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Open a compact client-ready report for review or printing.
+              </p>
+            </Link>
+
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/recommendations`}
+              className="rounded-2xl border border-[#e6dcc8] bg-white p-5 transition hover:border-[#d4af37]/60 hover:bg-[#fff8df]"
+            >
+              <p className="text-sm font-bold text-slate-950">
+                Recommendations
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Review prioritized next actions based on audit and keyword data.
+              </p>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-[#e6dcc8] bg-[#111111] text-white shadow-sm">
+          <CardHeader className="border-b border-white/10 p-5 md:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+              Summary
+            </p>
+
+            <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+              Current status
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="space-y-4 p-5 md:p-6">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-semibold text-white">Audit</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {latestAudit
+                  ? `Last audit score is ${latestAudit.score ?? "--"}.`
+                  : "No audit has been run yet."}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-semibold text-white">Search data</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {keywordList.length > 0
+                  ? `${keywordList.length} keyword rows loaded with ${formatNumber(
+                      totalClicks
+                    )} clicks and ${formatNumber(totalImpressions)} impressions.`
+                  : "No keyword rows loaded yet."}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-semibold text-white">Next step</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Run an audit first, then review keywords, export the report, and
+                work through recommendations.
+              </p>
             </div>
           </CardContent>
         </Card>
-
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base text-slate-950">
-              Recommended Next Actions
-            </CardTitle>
-            <p className="text-sm text-slate-500">
-              Suggested focus based on latest project data.
-            </p>
-          </CardHeader>
-
-          <CardContent>
-            <div className="grid gap-3">
-              {!latestAudit && (
-                <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-                  <p className="font-semibold text-slate-950">
-                    Run the first SEO audit
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Generate the first score, issue list, and report data for
-                    this project.
-                  </p>
-                </div>
-              )}
-
-              {issueCount > 0 && (
-                <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-                  <p className="font-semibold text-slate-950">
-                    Fix detected SEO issues
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Review metadata, headings, crawl, and on-page issues from
-                    the latest audit.
-                  </p>
-                </div>
-              )}
-
-              {nearPageOneKeywords.length > 0 && (
-                <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
-                  <p className="font-semibold text-[#7a5b00]">
-                    Improve near page 1 keywords
-                  </p>
-                  <p className="mt-1 text-sm text-[#7a5b00]/80">
-                    Strengthen internal links and content relevance for keywords
-                    ranking in positions 11–20.
-                  </p>
-                </div>
-              )}
-
-              {lowCtrKeywords.length > 0 && (
-                <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
-                  <p className="font-semibold text-[#7a5b00]">
-                    Improve low CTR keywords
-                  </p>
-                  <p className="mt-1 text-sm text-[#7a5b00]/80">
-                    Update title tags and meta descriptions for keywords with
-                    impressions but weak clicks.
-                  </p>
-                </div>
-              )}
-
-              {latestAudit && issueCount === 0 && keywordCount === 0 && (
-                <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-                  <p className="font-semibold text-slate-950">
-                    Import keyword data
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Connect and fetch Google Search Console data to unlock
-                    keyword visibility insights.
-                  </p>
-                </div>
-              )}
-
-              {latestAudit &&
-                issueCount === 0 &&
-                keywordCount > 0 &&
-                lowCtrKeywords.length === 0 &&
-                nearPageOneKeywords.length === 0 && (
-                  <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
-                    <p className="font-semibold text-[#7a5b00]">
-                      Project is in good shape
-                    </p>
-                    <p className="mt-1 text-sm text-[#7a5b00]/80">
-                      Continue monitoring audits and keyword data after major
-                      website updates.
-                    </p>
-                  </div>
-                )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base text-slate-950">
-              Latest SEO Issues
-            </CardTitle>
-            <p className="mt-1 text-sm text-slate-500">
-              Top findings from the latest audit.
-            </p>
-          </CardHeader>
-
-          <CardContent>
-            {topIssues.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
-                <p className="text-sm text-slate-500">
-                  No SEO issues found yet. Run an audit to detect technical and
-                  on-page issues.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-[#e6dcc8]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-[#faf7ef]">
-                      <TableHead>Issue</TableHead>
-                      <TableHead>Severity</TableHead>
-                      <TableHead>Category</TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {topIssues.map((issue) => (
-                      <TableRow key={issue.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-slate-950">
-                              {issue.title}
-                            </p>
-                            <p className="line-clamp-2 text-sm text-slate-500">
-                              {issue.description || "No description available."}
-                            </p>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          <span
-                            className={`rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${getSeverityBadgeClass(
-                              issue.severity
-                            )}`}
-                          >
-                            {issue.severity || "medium"}
-                          </span>
-                        </TableCell>
-
-                        <TableCell className="capitalize text-slate-500">
-                          {issue.category || "general"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base text-slate-950">
-              Top Keywords
-            </CardTitle>
-            <p className="mt-1 text-sm text-slate-500">
-              Keywords with highest impressions.
-            </p>
-          </CardHeader>
-
-          <CardContent>
-            {topKeywords.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
-                <p className="text-sm text-slate-500">
-                  No keyword data yet. Fetch Google Search Console data from the
-                  Keywords page.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-[#e6dcc8]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-[#faf7ef]">
-                      <TableHead>Keyword</TableHead>
-                      <TableHead>Impr.</TableHead>
-                      <TableHead>Clicks</TableHead>
-                      <TableHead>Pos.</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {topKeywords.map((keyword) => (
-                      <TableRow key={keyword.id}>
-                        <TableCell className="font-medium text-slate-950">
-                          {keyword.query}
-                        </TableCell>
-
-                        <TableCell>
-                          {formatNumber(keyword.impressions)}
-                        </TableCell>
-
-                        <TableCell>{formatNumber(keyword.clicks)}</TableCell>
-
-                        <TableCell>{formatPosition(keyword.position)}</TableCell>
-
-                        <TableCell>
-                          <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-2.5 py-1 text-xs font-medium text-slate-600">
-                            {getKeywordStatus(keyword)}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      </section>
     </div>
   );
 }
