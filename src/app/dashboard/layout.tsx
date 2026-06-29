@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import DashboardNav from "@/components/dashboard-nav";
 
 type DashboardLayoutProps = {
   children: React.ReactNode;
@@ -40,14 +41,17 @@ export default async function DashboardLayout({
     {
       label: "Dashboard",
       href: "/dashboard",
+      activeMatch: "/dashboard",
     },
     {
       label: "SEO Audit",
       href: "/dashboard/projects",
+      activeMatch: "/dashboard/projects",
     },
     {
       label: "Billing",
       href: "/pricing",
+      activeMatch: "/pricing",
     },
   ];
 
@@ -70,21 +74,7 @@ export default async function DashboardLayout({
             </Link>
           </div>
 
-          <nav className="flex-1 space-y-2 p-4">
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b6a46a]">
-              Menu
-            </p>
-
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center rounded-2xl border border-transparent px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-[#d4af37]/30 hover:bg-white/10 hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <DashboardNav items={navItems} />
 
           <div className="border-t border-white/10 p-4">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
@@ -139,17 +129,7 @@ export default async function DashboardLayout({
             </div>
 
             <div className="border-t border-[#e6dcc8] bg-white/70 px-4 py-2 lg:hidden">
-              <div className="flex gap-2 overflow-x-auto">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="whitespace-nowrap rounded-full border border-[#e6dcc8] bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-[#d4af37]/50 hover:bg-[#fff8df] hover:text-[#7a5b00]"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
+              <DashboardNav items={navItems} mobile />
             </div>
           </header>
 
