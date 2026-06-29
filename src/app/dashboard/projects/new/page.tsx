@@ -109,54 +109,53 @@ export default async function NewProjectPage({
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-3xl border border-[#e6dcc8] bg-white shadow-sm">
-        <div className="relative p-6 md:p-8">
-          <div className="absolute right-0 top-0 h-52 w-52 rounded-full bg-[#d4af37]/10 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-44 w-44 rounded-full bg-slate-100 blur-3xl" />
+      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard">← Back to Dashboard</Link>
+            </Button>
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-                New Project
-              </p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Add Project
+            </p>
 
-              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-                Add a website to audit
-              </h1>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+              Create a new audit project
+            </h1>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Create a new SEO audit project, then run technical checks, sync
-                Google Search Console keyword data, export reports, and review
-                recommendations.
-              </p>
-            </div>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+              Add the client website name and URL. After creating the project,
+              you will go straight to the overview where you can run the audit,
+              review keywords, open the report, and check recommendations.
+            </p>
+          </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="outline">
-                <Link href="/dashboard/projects">Back to Projects</Link>
-              </Button>
-
-              <Button asChild variant="outline">
-                <Link href="/dashboard">Dashboard</Link>
-              </Button>
-            </div>
+          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+            <Button asChild variant="outline">
+              <Link href="/dashboard/projects">SEO Audit</Link>
+            </Button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl text-slate-950">
-              Project details
+          <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Project Details
+            </p>
+
+            <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+              Website information
             </CardTitle>
+
             <p className="text-sm leading-6 text-slate-500">
-              Add the client website name and domain. The domain can include or
-              exclude https://.
+              Use a clear project name and the website URL you want to audit.
             </p>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="p-5 md:p-6">
             {errorMessage ? (
               <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
                 {errorMessage}
@@ -169,7 +168,7 @@ export default async function NewProjectPage({
                   htmlFor="name"
                   className="text-sm font-semibold text-slate-950"
                 >
-                  Project name
+                  Project Name
                 </label>
 
                 <input
@@ -182,8 +181,7 @@ export default async function NewProjectPage({
                 />
 
                 <p className="text-xs leading-5 text-slate-500">
-                  Use the client name or website name. This will appear on the
-                  project dashboard and reports.
+                  Use the client name, brand name, or website name.
                 </p>
               </div>
 
@@ -205,21 +203,19 @@ export default async function NewProjectPage({
                 />
 
                 <p className="text-xs leading-5 text-slate-500">
-                  You can enter example.com or https://example.com. RankCraft
-                  Audit will normalize the URL automatically.
+                  You can enter example.com or https://example.com.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
                 <p className="text-sm font-semibold text-[#7a5b00]">
-                  What happens next?
+                  Next step after creating
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-[#7a5b00]/80">
-                  After creating the project, open the project overview and run
-                  the first audit. Once Google Search Console is connected, the
-                  Keywords, Reports, and Recommendations pages will become more
-                  useful.
+                  You will be redirected to the Overview page. From there, run
+                  the first audit, sync keyword data, open the report, and
+                  review recommendations.
                 </p>
               </div>
 
@@ -227,7 +223,7 @@ export default async function NewProjectPage({
                 <Button type="submit">Create Project</Button>
 
                 <Button asChild type="button" variant="outline">
-                  <Link href="/dashboard/projects">Cancel</Link>
+                  <Link href="/dashboard">Cancel</Link>
                 </Button>
               </div>
             </form>
@@ -236,63 +232,64 @@ export default async function NewProjectPage({
 
         <div className="space-y-4">
           <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
-            <CardContent className="p-5">
+            <CardHeader className="border-b border-white/10 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b6a46a]">
-                Project Workflow
+                Workflow
               </p>
 
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
-                From audit to action plan
-              </h2>
+              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+                What happens next
+              </CardTitle>
+            </CardHeader>
 
-              <div className="mt-5 grid gap-3">
-                {[
-                  {
-                    step: "01",
-                    title: "Create project",
-                    description:
-                      "Add the website name and domain to start tracking SEO data.",
-                  },
-                  {
-                    step: "02",
-                    title: "Run audit",
-                    description:
-                      "Scan metadata, headings, canonical tags, mobile setup, and technical issues.",
-                  },
-                  {
-                    step: "03",
-                    title: "Review keywords",
-                    description:
-                      "Use GSC data to find ranking, CTR, and visibility opportunities.",
-                  },
-                  {
-                    step: "04",
-                    title: "Export report",
-                    description:
-                      "Generate a compact client-ready report with issues and action steps.",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.step}
-                    className="rounded-2xl border border-white/10 bg-white/10 p-4"
-                  >
-                    <div className="flex gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-xs font-bold text-[#f5d56a]">
-                        {item.step}
-                      </div>
+            <CardContent className="space-y-3 p-5">
+              {[
+                {
+                  step: "01",
+                  title: "Create project",
+                  description:
+                    "Add the website name and URL to start the audit workspace.",
+                },
+                {
+                  step: "02",
+                  title: "Run audit",
+                  description:
+                    "Scan metadata, headings, canonical tags, mobile setup, and technical issues.",
+                },
+                {
+                  step: "03",
+                  title: "Review keywords",
+                  description:
+                    "Use GSC data to find ranking, CTR, and visibility opportunities.",
+                },
+                {
+                  step: "04",
+                  title: "Export report",
+                  description:
+                    "Open a compact client-ready report with issues and action steps.",
+                },
+              ].map((item) => (
+                <div
+                  key={item.step}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="flex gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-xs font-bold text-[#f5d56a]">
+                      {item.step}
+                    </div>
 
-                      <div>
-                        <p className="font-semibold text-white">
-                          {item.title}
-                        </p>
-                        <p className="mt-1 text-sm leading-5 text-slate-400">
-                          {item.description}
-                        </p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {item.title}
+                      </p>
+
+                      <p className="mt-1 text-sm leading-5 text-slate-400">
+                        {item.description}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
@@ -312,6 +309,7 @@ export default async function NewProjectPage({
                   <p className="font-semibold text-slate-950">
                     {project.name}
                   </p>
+
                   <p className="mt-1 text-sm text-slate-500">
                     {normalizeDomainForDisplay(project.domain)}
                   </p>
