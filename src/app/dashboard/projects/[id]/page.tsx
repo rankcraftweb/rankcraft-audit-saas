@@ -139,7 +139,9 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
 
   const { data: keywordRows } = await supabase
     .from("gsc_keyword_rows")
-    .select("id, project_id, query, page, clicks, impressions, ctr, position, created_at")
+    .select(
+      "id, project_id, query, page, clicks, impressions, ctr, position, created_at"
+    )
     .eq("project_id", currentProject.id)
     .order("impressions", { ascending: false })
     .limit(5);
@@ -198,6 +200,12 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
             <Button asChild variant="outline">
               <Link href={`/dashboard/projects/${currentProject.id}/reports`}>
                 Report
+              </Link>
+            </Button>
+
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${currentProject.id}/settings`}>
+                Settings
               </Link>
             </Button>
           </div>
@@ -336,6 +344,17 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Review prioritized next actions based on audit and keyword data.
+              </p>
+            </Link>
+
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/settings`}
+              className="rounded-2xl border border-[#e6dcc8] bg-white p-5 transition hover:border-[#d4af37]/60 hover:bg-[#fff8df] md:col-span-2"
+            >
+              <p className="text-sm font-bold text-slate-950">Settings</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Edit the project name, update the website URL, or delete the
+                project.
               </p>
             </Link>
           </CardContent>
