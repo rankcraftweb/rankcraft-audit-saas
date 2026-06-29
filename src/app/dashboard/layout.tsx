@@ -50,8 +50,8 @@ export default async function DashboardLayout({
     },
     {
       label: "Billing",
-      href: "/pricing",
-      activeMatch: "/pricing",
+      href: "/dashboard/billing",
+      activeMatch: "/dashboard/billing",
     },
   ];
 

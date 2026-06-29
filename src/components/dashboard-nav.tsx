@@ -22,7 +22,10 @@ function isActivePath(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(item.activeMatch);
 }
 
-export default function DashboardNav({ items, mobile = false }: DashboardNavProps) {
+export default function DashboardNav({
+  items,
+  mobile = false,
+}: DashboardNavProps) {
   const pathname = usePathname();
 
   if (mobile) {
