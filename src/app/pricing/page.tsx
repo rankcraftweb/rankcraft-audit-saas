@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +18,13 @@ type Plan = {
   cta: string;
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const plans: Plan[] = [
     {
       name: "Starter",
@@ -63,54 +70,89 @@ export default function PricingPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f3ea] text-slate-950">
-      <header className="border-b border-[#e6dcc8] bg-white/80 backdrop-blur">
+      <header className="border-b border-[#e6dcc8] bg-[#f7f3ea]/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 md:px-6">
           <Link href="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#d4af37]/50 bg-[#111111] text-sm font-bold text-[#f5d56a]">
               RC
             </div>
 
-            <div>
-              <p className="text-sm font-bold tracking-tight text-slate-950">
-                RankCraft Audit
-              </p>
-              <p className="text-xs text-slate-500">
-                SEO SaaS Dashboard
-              </p>
-            </div>
+            <p className="text-sm font-bold tracking-tight text-slate-950">
+              RankCraft Audit
+            </p>
           </Link>
 
-          <div className="flex items-center gap-3">
-            <Button asChild variant="outline">
-              <Link href="/">Home</Link>
-            </Button>
+          <nav className="hidden items-center gap-8 md:flex">
+            <Link
+              href="/#features"
+              className="text-sm font-semibold text-slate-600 transition hover:text-slate-950"
+            >
+              Features
+            </Link>
 
-            <Button asChild>
-              <Link href="/dashboard">Open App</Link>
-            </Button>
+            <Link
+              href="/pricing"
+              className="text-sm font-semibold text-[#7a5b00]"
+            >
+              Pricing
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-2">
+            {user ? (
+              <Button asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild variant="outline">
+                  <Link href="/login">Login</Link>
+                </Button>
+
+                <Button asChild>
+                  <Link href="/signup">Sign up</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
       <section className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
-        <div className="overflow-hidden rounded-3xl border border-[#e6dcc8] bg-white shadow-sm">
-          <div className="relative p-6 text-center md:p-10">
-            <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#d4af37]/10 blur-3xl" />
-            <div className="absolute bottom-0 left-1/3 h-44 w-44 rounded-full bg-slate-100 blur-3xl" />
+        <div className="overflow-hidden rounded-3xl border border-[#2b2413] bg-[#111111] shadow-sm">
+          <div className="relative p-6 text-center md:p-12">
+            <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-[#d4af37]/20 blur-3xl" />
+            <div className="absolute bottom-0 left-1/3 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
 
             <div className="relative mx-auto max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
                 Pricing
               </p>
 
-              <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 md:text-5xl">
-                Simple plans for SEO audits and reporting.
+              <h1 className="mt-4 text-4xl font-bold tracking-tight text-white md:text-5xl">
+                Simple plans for SEO audits and client reports.
               </h1>
 
-              <p className="mt-4 text-sm leading-6 text-slate-500 md:text-base">
-                Start small, then upgrade when you need more projects, scans,
-                keyword tracking, and client reporting features.
+              <p className="mt-5 text-sm leading-6 text-slate-300 md:text-base">
+                Start with one website, then upgrade when you need more audits,
+                keyword data, and client-ready reporting capacity.
               </p>
+
+              <div className="mt-7 flex flex-wrap justify-center gap-3">
+                <Button asChild>
+                  <Link href={user ? "/dashboard" : "/signup"}>
+                    {user ? "Open Dashboard" : "Start Free"}
+                  </Link>
+                </Button>
+
+                <Button
+                  asChild
+                  variant="outline"
+                  className="bg-transparent text-white hover:bg-white/10"
+                >
+                  <Link href="/">Back to Home</Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -131,7 +173,7 @@ export default function PricingPage() {
                 </div>
               ) : null}
 
-              <CardHeader className="pb-4">
+              <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
                 <CardTitle className="text-xl font-bold text-slate-950">
                   {plan.name}
                 </CardTitle>
@@ -141,12 +183,19 @@ export default function PricingPage() {
                 </p>
               </CardHeader>
 
-              <CardContent className="flex min-h-[430px] flex-col">
-                <div className="rounded-3xl border border-[#e6dcc8] bg-[#faf7ef] p-5">
+              <CardContent className="flex min-h-[430px] flex-col p-5 md:p-6">
+                <div
+                  className={
+                    plan.badge
+                      ? "rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5"
+                      : "rounded-3xl border border-[#e6dcc8] bg-[#faf7ef] p-5"
+                  }
+                >
                   <div className="flex items-end gap-2">
                     <p className="text-5xl font-bold tracking-tight text-slate-950">
                       {plan.price}
                     </p>
+
                     <p className="pb-2 text-sm text-slate-500">
                       {plan.period}
                     </p>
@@ -169,11 +218,13 @@ export default function PricingPage() {
 
                 <div className="mt-auto pt-8">
                   <Button asChild className="w-full">
-                    <Link href="/dashboard">{plan.cta}</Link>
+                    <Link href={user ? "/dashboard/billing" : "/signup"}>
+                      {plan.cta}
+                    </Link>
                   </Button>
 
                   <p className="mt-3 text-center text-xs text-slate-500">
-                    Billing connection can be added after MVP validation.
+                    Stripe checkout will be connected after MVP validation.
                   </p>
                 </div>
               </CardContent>
@@ -181,20 +232,24 @@ export default function PricingPage() {
           ))}
         </section>
 
-        <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_0.8fr]">
+        <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_380px]">
           <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl text-slate-950">
-                What is included?
+            <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+                Included
+              </p>
+
+              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                Built for SEO audit delivery
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="grid gap-3 md:grid-cols-2">
+            <CardContent className="grid gap-3 p-5 md:grid-cols-2 md:p-6">
               {[
                 {
                   title: "SEO audit runner",
                   description:
-                    "Run checks for metadata, headings, canonical tags, mobile setup, and basic technical SEO issues.",
+                    "Run checks for metadata, headings, canonical tags, mobile setup, and technical SEO issues.",
                 },
                 {
                   title: "PageSpeed scores",
@@ -204,7 +259,7 @@ export default function PricingPage() {
                 {
                   title: "Keyword tracking",
                   description:
-                    "Use Google Search Console keyword data to review clicks, impressions, CTR, and average position.",
+                    "Use Google Search Console data to review clicks, impressions, CTR, and average position.",
                 },
                 {
                   title: "Client reports",
@@ -217,6 +272,7 @@ export default function PricingPage() {
                   className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4"
                 >
                   <p className="font-semibold text-slate-950">{item.title}</p>
+
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {item.description}
                   </p>
@@ -226,38 +282,38 @@ export default function PricingPage() {
           </Card>
 
           <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
-            <CardContent className="p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b6a46a]">
-                MVP Billing Note
+            <CardHeader className="border-b border-white/10 p-5 md:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+                MVP Note
               </p>
 
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
-                Pricing page is ready for SaaS positioning.
-              </h2>
+              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+                Pricing is ready for validation.
+              </CardTitle>
+            </CardHeader>
 
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                For now, the plan buttons open the app. Later, Stripe checkout
-                can be connected to these plans once the MVP audit flow is fully
-                tested.
-              </p>
+            <CardContent className="space-y-4 p-5 md:p-6">
+              {[
+                "Keep plan structure simple for MVP.",
+                "Validate audit, keyword, report, and recommendations flow first.",
+                "Connect Stripe after the core workflow is stable.",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300"
+                >
+                  {item}
+                </div>
+              ))}
 
-              <div className="mt-5 grid gap-3">
-                {[
-                  "Keep plan structure simple for MVP",
-                  "Validate audit/report workflow first",
-                  "Add Stripe after core flow is stable",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-slate-300"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
+              <Button asChild className="w-full">
+                <Link href={user ? "/dashboard" : "/signup"}>
+                  {user ? "Open Dashboard" : "Create Account"}
+                </Link>
+              </Button>
 
-              <Button asChild className="mt-6 w-full">
-                <Link href="/dashboard">Open Dashboard</Link>
+              <Button asChild variant="outline" className="w-full bg-transparent">
+                <Link href="/">Back to Home</Link>
               </Button>
             </CardContent>
           </Card>
