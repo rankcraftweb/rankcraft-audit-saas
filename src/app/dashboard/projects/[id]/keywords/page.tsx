@@ -1,5 +1,7 @@
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,11 +16,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import KeywordsSyncButton from "./sync-button";
 
 type KeywordsPageProps = {
   params: Promise<{
     id: string;
   }>;
+};
+
+type Project = {
+  id: string;
+  name: string;
+  domain: string;
+  created_at: string;
+  user_id: string;
 };
 
 type GscKeywordRow = {
@@ -40,7 +51,7 @@ type KeywordInsight = GscKeywordRow & {
   reason: string;
 };
 
-function normalizeDomainForDisplay(domain: string) {
+function normalizeDomain(domain: string) {
   return domain
     .replace("https://", "")
     .replace("http://", "")
@@ -122,7 +133,7 @@ function getKeywordStatusClass(status: string) {
   }
 
   if (status === "Low CTR" || status === "CTR Gap") {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
   if (status === "Needs Work") {
@@ -135,10 +146,6 @@ function getKeywordStatusClass(status: string) {
 function getIntentClass(intent: string) {
   if (intent === "Commercial") {
     return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
-  }
-
-  if (intent === "Informational") {
-    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
   }
 
   if (intent === "Brand") {
@@ -343,22 +350,33 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
 
   const supabase = await createClient();
 
-  const { data: project, error: projectError } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: project } = await supabase
     .from("projects")
-    .select("id, name, domain, created_at")
+    .select("id, name, domain, created_at, user_id")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
-  if (projectError || !project) {
+  if (!project) {
     notFound();
   }
+
+  const currentProject = project as Project;
 
   const { data: gscKeywordRows } = await supabase
     .from("gsc_keyword_rows")
     .select(
       "id, query, clicks, impressions, ctr, position, start_date, end_date, created_at"
     )
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -434,66 +452,152 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-[#e6dcc8] bg-white p-5 shadow-sm md:p-6">
-        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-          <div className="max-w-3xl space-y-3">
-            <div className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#fff8df] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
-              Google Search Console
-            </div>
+      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/projects/${currentProject.id}`}>
+                ← Back to Overview
+              </Link>
+            </Button>
 
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
-                Keyword Performance
-              </h1>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Keywords
+            </p>
 
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                {project.name} · {normalizeDomainForDisplay(project.domain)}
-              </p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+              Search performance
+            </h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Track search visibility, clicks, CTR gaps, ranking positions,
-                and keyword opportunities from the latest GSC sync.
-              </p>
-            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              {currentProject.name} · {normalizeDomain(currentProject.domain)}
+            </p>
+
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              Review Google Search Console keyword data, ranking positions,
+              CTR gaps, and keyword opportunities from the latest sync.
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] p-4 text-white">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b6a46a]">
-                  Latest Keyword Sync
-                </p>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-white">
-                  {formatNumber(keywordList.length)}
-                </p>
-              </div>
+          <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+            <KeywordsSyncButton projectId={currentProject.id} />
 
-              <span className="rounded-full border border-[#d4af37]/50 bg-[#d4af37] px-3 py-1 text-xs font-semibold text-black">
-                {keywordList.length > 0 ? "Synced" : "No Data"}
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${currentProject.id}/reports`}>
+                Report
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Keywords
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {formatNumber(keywordList.length)}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">Latest synced queries</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#d4af37]/40 bg-[#fff8df] shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+              Impressions
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {formatNumber(totalImpressions)}
+            </p>
+            <p className="mt-2 text-sm text-[#7a5b00]/80">
+              Search visibility
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Clicks
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {formatNumber(totalClicks)}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">Organic clicks</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Avg. Position
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-4xl font-bold tracking-tight text-slate-950">
+              {formatPosition(averagePosition)}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">Lower is better</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="rounded-3xl border border-[#e6dcc8] bg-[#111111] p-5 text-white shadow-sm md:p-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+              Latest Sync
+            </p>
+
+            <h2 className="mt-2 text-xl font-bold tracking-tight text-white">
+              {keywordList.length > 0 ? "Keyword data available" : "No data yet"}
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Date range:{" "}
+              <span className="font-semibold text-white">
+                {latestKeywordDate}
               </span>
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Last Imported
+              </p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {formatDate(allKeywordRows[0]?.created_at)}
+              </p>
             </div>
 
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 rounded-xl border border-white/10 bg-white/10 p-3">
-                <span className="text-slate-400">Date Range</span>
-                <span className="text-right font-semibold text-white">
-                  {latestKeywordDate}
-                </span>
-              </div>
-
-              <div className="flex justify-between gap-4 rounded-xl border border-white/10 bg-white/10 p-3">
-                <span className="text-slate-400">Last Imported</span>
-                <span className="text-right font-semibold text-white">
-                  {formatDate(allKeywordRows[0]?.created_at)}
-                </span>
-              </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Average CTR
+              </p>
+              <p className="mt-2 text-2xl font-bold text-white">
+                {formatCtr(averageCtr)}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       {keywordList.length === 0 ? (
-        <Card className="rounded-2xl border-dashed border-[#d4af37]/50 bg-white shadow-sm">
+        <Card className="rounded-3xl border-dashed border-[#d4af37]/50 bg-white shadow-sm">
           <CardContent className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#111111] text-lg font-bold text-[#d4af37]">
               GSC
@@ -504,63 +608,14 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
             </h2>
 
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Once Google Search Console keyword rows are imported, this page
-              will show clicks, impressions, CTR, ranking positions, and
-              optimization opportunities.
+              Sync Google Search Console data to show clicks, impressions, CTR,
+              ranking positions, and keyword opportunities.
             </p>
           </CardContent>
         </Card>
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {[
-              {
-                label: "Tracked Keywords",
-                value: formatNumber(keywordList.length),
-                helper: "Latest synced queries.",
-              },
-              {
-                label: "Total Clicks",
-                value: formatNumber(totalClicks),
-                helper: "Organic search clicks.",
-              },
-              {
-                label: "Impressions",
-                value: formatNumber(totalImpressions),
-                helper: "Search visibility.",
-              },
-              {
-                label: "Average CTR",
-                value: formatCtr(averageCtr),
-                helper: "Click-through rate.",
-              },
-              {
-                label: "Avg. Position",
-                value: formatPosition(averagePosition),
-                helper: "Lower is better.",
-              },
-            ].map((item) => (
-              <Card
-                key={item.label}
-                className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    {item.label}
-                  </CardTitle>
-                </CardHeader>
-
-                <CardContent>
-                  <p className="text-3xl font-bold tracking-tight text-slate-950">
-                    {item.value}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-3">
             <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
               <CardHeader>
                 <CardTitle className="text-sm text-slate-950">
@@ -630,58 +685,78 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
                 </p>
               </CardContent>
             </Card>
-          </div>
+          </section>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              {
-                label: "Page 1 Keywords",
-                value: pageOneKeywords.length,
-                helper: "Ranking from positions 1–10.",
-              },
-              {
-                label: "Opportunities",
-                value: opportunityKeywords.length,
-                helper: "Close to stronger movement.",
-              },
-              {
-                label: "Low CTR Keywords",
-                value: lowCtrKeywords.length,
-                helper: "Visibility with weak clicks.",
-              },
-            ].map((item) => (
-              <Card
-                key={item.label}
-                className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm"
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    {item.label}
-                  </CardTitle>
-                </CardHeader>
+          <section className="grid gap-4 md:grid-cols-3">
+            <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Page 1 Keywords
+                </CardTitle>
+              </CardHeader>
 
-                <CardContent>
-                  <p className="text-3xl font-bold tracking-tight text-slate-950">
-                    {item.value}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+              <CardContent>
+                <p className="text-3xl font-bold tracking-tight text-slate-950">
+                  {pageOneKeywords.length}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Ranking from positions 1–10.
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base text-slate-950">
-                Top Keyword Opportunities
+            <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Opportunities
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold tracking-tight text-slate-950">
+                  {opportunityKeywords.length}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Close to stronger movement.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Low CTR Keywords
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold tracking-tight text-slate-950">
+                  {lowCtrKeywords.length}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Visibility with weak clicks.
+                </p>
+              </CardContent>
+            </Card>
+          </section>
+
+          <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
+            <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+                Opportunities
+              </p>
+
+              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                Top keyword opportunities
               </CardTitle>
+
               <p className="text-sm text-slate-500">
                 Keywords with the strongest improvement potential from the
                 latest sync.
               </p>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="p-5 md:p-6">
               {topOpportunities.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[#d4af37]/50 bg-[#faf7ef] p-6">
                   <p className="text-sm text-slate-500">
@@ -700,6 +775,7 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9a7a19]">
                             Opportunity #{index + 1}
                           </p>
+
                           <h3 className="mt-1 text-lg font-semibold text-slate-950">
                             {keyword.query}
                           </h3>
@@ -730,9 +806,7 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-4">
                         <div className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3">
-                          <p className="text-xs text-slate-500">
-                            Impressions
-                          </p>
+                          <p className="text-xs text-slate-500">Impressions</p>
                           <p className="mt-1 font-semibold text-slate-950">
                             {formatNumber(keyword.impressions)}
                           </p>
@@ -770,17 +844,22 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base text-slate-950">
-                All Keywords
+          <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
+            <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+                Keyword Rows
+              </p>
+
+              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                All keywords
               </CardTitle>
+
               <p className="text-sm text-slate-500">
                 Latest synced keyword rows from Google Search Console.
               </p>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="p-5 md:p-6">
               <div className="overflow-x-auto rounded-2xl border border-[#e6dcc8]">
                 <Table className="min-w-[980px]">
                   <TableHeader>

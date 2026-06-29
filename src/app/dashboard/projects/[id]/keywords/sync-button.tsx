@@ -54,13 +54,13 @@ export default function KeywordsSyncButton({
         type="button"
         onClick={handleSync}
         disabled={isSyncing}
-        className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-10 items-center justify-center rounded-2xl bg-[#111111] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2b2413] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isSyncing ? "Syncing..." : "Sync Keywords"}
+        {isSyncing ? "Syncing..." : "Sync GSC Data"}
       </button>
 
       {message ? (
-        <p className="max-w-[260px] text-left text-xs leading-5 text-slate-500 sm:text-right">
+        <p className="max-w-[280px] text-left text-xs leading-5 text-slate-500 sm:text-right">
           {message}
         </p>
       ) : null}
