@@ -18,6 +18,25 @@ type Plan = {
   cta: string;
 };
 
+function buildPlanRequestLink(planName: string, userEmail?: string) {
+  const subject = `RankCraft Audit ${planName} Plan Request`;
+
+  const body = `Hi RankCraft Web,
+
+I would like to request access to the ${planName} plan for RankCraft Audit.
+
+Account email: ${userEmail || ""}
+Plan: ${planName}
+
+Please send me the next steps for billing and activation.
+
+Thank you.`;
+
+  return `mailto:rankcraftweb@gmail.com?subject=${encodeURIComponent(
+    subject
+  )}&body=${encodeURIComponent(body)}`;
+}
+
 export default async function PricingPage() {
   const supabase = await createClient();
 
@@ -37,7 +56,7 @@ export default async function PricingPage() {
         "10 keyword rows",
         "1 report per month",
       ],
-      cta: "Start Starter",
+      cta: "Request Starter",
     },
     {
       name: "Growth",
@@ -51,7 +70,7 @@ export default async function PricingPage() {
         "GSC keyword tracking",
         "Branded client reports",
       ],
-      cta: "Start Growth",
+      cta: "Request Growth",
     },
     {
       name: "Agency",
@@ -64,7 +83,7 @@ export default async function PricingPage() {
         "Advanced reporting",
         "Priority support",
       ],
-      cta: "Start Agency",
+      cta: "Request Agency",
     },
   ];
 
@@ -134,14 +153,14 @@ export default async function PricingPage() {
               </h1>
 
               <p className="mt-5 text-sm leading-6 text-slate-300 md:text-base">
-                Start with one website, then upgrade when you need more audits,
-                keyword data, and client-ready reporting capacity.
+                Request the plan that fits your audit workflow. Online checkout
+                is being prepared, so billing is handled manually during MVP.
               </p>
 
               <div className="mt-7 flex flex-wrap justify-center gap-3">
                 <Button asChild>
                   <Link href={user ? "/dashboard" : "/signup"}>
-                    {user ? "Open Dashboard" : "Start Free"}
+                    {user ? "Open Dashboard" : "Create Account"}
                   </Link>
                 </Button>
 
@@ -156,6 +175,22 @@ export default async function PricingPage() {
             </div>
           </div>
         </div>
+
+        <section className="mt-6 rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5 shadow-sm md:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a5b00]">
+            Manual Billing During MVP
+          </p>
+
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+            Plan requests are reviewed manually.
+          </h2>
+
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[#7a5b00]/80">
+            RankCraft Audit is already live, but online checkout is still being
+            prepared. Choose a plan below to request access and receive billing
+            instructions.
+          </p>
+        </section>
 
         <section className="mt-6 grid gap-5 lg:grid-cols-3">
           {plans.map((plan) => (
@@ -200,6 +235,10 @@ export default async function PricingPage() {
                       {plan.period}
                     </p>
                   </div>
+
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    Manual billing while checkout is pending.
+                  </p>
                 </div>
 
                 <div className="mt-6 space-y-3">
@@ -218,13 +257,13 @@ export default async function PricingPage() {
 
                 <div className="mt-auto pt-8">
                   <Button asChild className="w-full">
-                    <Link href={user ? "/dashboard/billing" : "/signup"}>
+                    <Link href={buildPlanRequestLink(plan.name, user?.email)}>
                       {plan.cta}
                     </Link>
                   </Button>
 
                   <p className="mt-3 text-center text-xs text-slate-500">
-                    Stripe checkout will be connected after MVP validation.
+                    This sends a manual plan request to RankCraft Web.
                   </p>
                 </div>
               </CardContent>
@@ -284,19 +323,19 @@ export default async function PricingPage() {
           <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
             <CardHeader className="border-b border-white/10 p-5 md:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
-                MVP Note
+                Payment Setup
               </p>
 
               <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
-                Pricing is ready for validation.
+                Online checkout is coming later.
               </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4 p-5 md:p-6">
               {[
-                "Keep plan structure simple for MVP.",
-                "Validate audit, keyword, report, and recommendations flow first.",
-                "Connect Stripe after the core workflow is stable.",
+                "Manual billing keeps the MVP launch-ready while payment verification is pending.",
+                "Plan requests are handled directly through RankCraft Web.",
+                "PayMongo checkout can be connected after online payments are fully enabled.",
               ].map((item) => (
                 <div
                   key={item}

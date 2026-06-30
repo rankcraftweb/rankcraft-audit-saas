@@ -19,6 +19,25 @@ type Plan = {
   cta: string;
 };
 
+function buildUpgradeRequestLink(planName: string, userEmail?: string) {
+  const subject = `RankCraft Audit ${planName} Plan Request`;
+
+  const body = `Hi RankCraft Web,
+
+I would like to request access to the ${planName} plan for RankCraft Audit.
+
+Account email: ${userEmail || ""}
+Plan: ${planName}
+
+Please send me the next steps for billing and activation.
+
+Thank you.`;
+
+  return `mailto:rankcraftweb@gmail.com?subject=${encodeURIComponent(
+    subject
+  )}&body=${encodeURIComponent(body)}`;
+}
+
 export default async function BillingPage() {
   const supabase = await createClient();
 
@@ -42,7 +61,7 @@ export default async function BillingPage() {
         "10 keyword rows",
         "1 report per month",
       ],
-      cta: "Choose Starter",
+      cta: "Request Starter",
     },
     {
       name: "Growth",
@@ -56,7 +75,7 @@ export default async function BillingPage() {
         "GSC keyword tracking",
         "Branded client reports",
       ],
-      cta: "Choose Growth",
+      cta: "Request Growth",
     },
     {
       name: "Agency",
@@ -69,15 +88,15 @@ export default async function BillingPage() {
         "Advanced reporting",
         "Priority support",
       ],
-      cta: "Choose Agency",
+      cta: "Request Agency",
     },
   ];
 
   const billingNotes = [
     {
-      title: "Current status",
+      title: "Manual billing for MVP",
       description:
-        "Billing is prepared for MVP positioning. Stripe checkout can be connected after the core audit workflow is fully tested.",
+        "Plan upgrades are handled manually while online payments are being verified and prepared.",
     },
     {
       title: "Recommended plan",
@@ -85,9 +104,9 @@ export default async function BillingPage() {
         "Growth is the best default plan for SEO specialists managing multiple client websites.",
     },
     {
-      title: "Next billing step",
+      title: "Payment integration later",
       description:
-        "After MVP QA, connect Stripe products, checkout sessions, and subscription status checks.",
+        "PayMongo checkout, webhooks, and subscription status can be connected after online payments are fully enabled.",
     },
   ];
 
@@ -109,9 +128,8 @@ export default async function BillingPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Choose the plan structure for RankCraft Audit. Billing checkout is
-              not connected yet, but the SaaS pricing layout is ready for MVP
-              validation.
+              Choose the plan you want to request. Billing is currently handled
+              manually while online payment checkout is being prepared.
             </p>
           </div>
 
@@ -124,6 +142,32 @@ export default async function BillingPage() {
               <Link href="/dashboard/projects">SEO Audit</Link>
             </Button>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5 shadow-sm md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a5b00]">
+              MVP Billing Mode
+            </p>
+
+            <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+              Manual plan requests are active.
+            </h2>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#7a5b00]/80">
+              PayMongo online payments are still being prepared. For now,
+              upgrade requests open an email so plans can be approved and billed
+              manually.
+            </p>
+          </div>
+
+          <Button asChild variant="outline">
+            <Link href="mailto:rankcraftweb@gmail.com?subject=RankCraft%20Audit%20Billing%20Question">
+              Contact Billing
+            </Link>
+          </Button>
         </div>
       </section>
 
@@ -168,6 +212,10 @@ export default async function BillingPage() {
 
                   <p className="pb-2 text-sm text-slate-500">{plan.period}</p>
                 </div>
+
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  Manual billing while online checkout is pending.
+                </p>
               </div>
 
               <div className="mt-6 space-y-3">
@@ -186,11 +234,13 @@ export default async function BillingPage() {
 
               <div className="mt-auto pt-8">
                 <Button asChild className="w-full">
-                  <Link href="/dashboard">{plan.cta}</Link>
+                  <Link href={buildUpgradeRequestLink(plan.name, user.email)}>
+                    {plan.cta}
+                  </Link>
                 </Button>
 
                 <p className="mt-3 text-center text-xs text-slate-500">
-                  Stripe checkout will be connected after MVP QA.
+                  This sends a manual upgrade request to RankCraft Web.
                 </p>
               </div>
             </CardContent>
@@ -250,11 +300,11 @@ export default async function BillingPage() {
         <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
           <CardHeader className="border-b border-white/10 p-5 md:p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
-              MVP Billing
+              Payment Setup
             </p>
 
             <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
-              Billing is staged for later
+              Checkout will be added later.
             </CardTitle>
           </CardHeader>
 
