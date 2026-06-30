@@ -76,18 +76,6 @@ function formatBillingMode(mode: string | null | undefined) {
   return mode.slice(0, 1).toUpperCase() + mode.slice(1);
 }
 
-function getPlanBadgeClass(plan: string | null | undefined) {
-  if (plan === "free") {
-    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
-  }
-
-  if (plan === "growth") {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
-  }
-
-  return "border-[#2b2413] bg-[#111111] text-[#d4af37]";
-}
-
 export default async function BillingPage() {
   const supabase = await createClient();
 
@@ -234,15 +222,7 @@ export default async function BillingPage() {
           </CardHeader>
 
           <CardContent>
-            <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPlanBadgeClass(
-                currentPlan
-              )}`}
-            >
-              {formatPlanName(currentPlan)}
-            </span>
-
-            <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+            <p className="text-3xl font-bold tracking-tight text-slate-950">
               {formatPlanName(currentPlan)}
             </p>
 
@@ -363,7 +343,9 @@ export default async function BillingPage() {
                       {plan.price}
                     </p>
 
-                    <p className="pb-2 text-sm text-slate-500">{plan.period}</p>
+                    <p className="pb-2 text-sm text-slate-500">
+                      {plan.period}
+                    </p>
                   </div>
 
                   <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -392,7 +374,9 @@ export default async function BillingPage() {
                     </Button>
                   ) : (
                     <Button asChild className="w-full">
-                      <Link href={buildUpgradeRequestLink(plan.name, user.email)}>
+                      <Link
+                        href={buildUpgradeRequestLink(plan.name, user.email)}
+                      >
                         {plan.cta}
                       </Link>
                     </Button>
