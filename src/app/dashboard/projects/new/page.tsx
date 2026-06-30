@@ -9,6 +9,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+type Plan = "free" | "starter" | "growth" | "agency";
+
+type NewProjectPageProps = {
+  searchParams?: Promise<{
+    error?: string;
+    plan?: string;
+  }>;
+};
+
+type Subscription = {
+  id: string;
+  user_id: string;
+  plan: Plan;
+  status: string;
+  billing_mode: string;
+};
+
 function normalizeDomain(input: string) {
   const trimmed = input.trim();
 
@@ -35,6 +52,52 @@ function normalizeDomainForDisplay(domain: string) {
     .replace(/\/$/, "");
 }
 
+function formatPlanName(plan: string | null | undefined) {
+  if (!plan) {
+    return "Free";
+  }
+
+  return plan.slice(0, 1).toUpperCase() + plan.slice(1);
+}
+
+function getProjectLimit(plan: string | null | undefined) {
+  if (plan === "agency") {
+    return null;
+  }
+
+  if (plan === "growth") {
+    return 10;
+  }
+
+  return 1;
+}
+
+function getLimitText(plan: string | null | undefined) {
+  const limit = getProjectLimit(plan);
+
+  if (limit === null) {
+    return "Unlimited projects";
+  }
+
+  return `${limit} project${limit === 1 ? "" : "s"}`;
+}
+
+function getPlanUpgradeMessage(plan: string | null | undefined) {
+  if (plan === "free") {
+    return "Your Free plan includes 1 project. Request Starter, Growth, or Agency to add more projects.";
+  }
+
+  if (plan === "starter") {
+    return "Your Starter plan includes 1 project. Request Growth or Agency to add more projects.";
+  }
+
+  if (plan === "growth") {
+    return "Your Growth plan includes 10 projects. Request Agency for unlimited projects.";
+  }
+
+  return "Your current plan limit has been reached.";
+}
+
 async function createProject(formData: FormData) {
   "use server";
 
@@ -56,6 +119,48 @@ async function createProject(formData: FormData) {
     redirect("/login");
   }
 
+  const { data: subscriptionData } = await supabase
+    .from("subscriptions")
+    .select("id, user_id, plan, status, billing_mode")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  let subscription = subscriptionData as Subscription | null;
+
+  if (!subscription) {
+    const { data: createdSubscription } = await supabase
+      .from("subscriptions")
+      .insert({
+        user_id: user.id,
+        plan: "free",
+        status: "active",
+        billing_mode: "manual",
+      })
+      .select("id, user_id, plan, status, billing_mode")
+      .single();
+
+    subscription = createdSubscription as Subscription | null;
+  }
+
+  const currentPlan = subscription?.plan || "free";
+  const projectLimit = getProjectLimit(currentPlan);
+
+  const { count: projectCount } = await supabase
+    .from("projects")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("user_id", user.id);
+
+  const currentProjectCount = projectCount || 0;
+
+  if (projectLimit !== null && currentProjectCount >= projectLimit) {
+    redirect(
+      `/dashboard/projects/new?error=project-limit&plan=${currentPlan}`
+    );
+  }
+
   const { data: project, error } = await supabase
     .from("projects")
     .insert({
@@ -73,24 +178,68 @@ async function createProject(formData: FormData) {
   redirect(`/dashboard/projects/${project.id}`);
 }
 
-type NewProjectPageProps = {
-  searchParams?: Promise<{
-    error?: string;
-  }>;
-};
-
 export default async function NewProjectPage({
   searchParams,
 }: NewProjectPageProps) {
   const resolvedSearchParams = await searchParams;
   const error = resolvedSearchParams?.error;
 
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: subscriptionData } = await supabase
+    .from("subscriptions")
+    .select("id, user_id, plan, status, billing_mode")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  let subscription = subscriptionData as Subscription | null;
+
+  if (!subscription) {
+    const { data: createdSubscription } = await supabase
+      .from("subscriptions")
+      .insert({
+        user_id: user.id,
+        plan: "free",
+        status: "active",
+        billing_mode: "manual",
+      })
+      .select("id, user_id, plan, status, billing_mode")
+      .single();
+
+    subscription = createdSubscription as Subscription | null;
+  }
+
+  const currentPlan = subscription?.plan || "free";
+  const projectLimit = getProjectLimit(currentPlan);
+
+  const { count: projectCount } = await supabase
+    .from("projects")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("user_id", user.id);
+
+  const currentProjectCount = projectCount || 0;
+  const hasReachedLimit =
+    projectLimit !== null && currentProjectCount >= projectLimit;
+
   const errorMessage =
     error === "missing-fields"
       ? "Please enter both project name and website URL."
       : error === "create-failed"
         ? "Project could not be created. Please check your details and try again."
-        : null;
+        : error === "project-limit"
+          ? getPlanUpgradeMessage(currentPlan)
+          : null;
 
   const exampleProjects = [
     {
@@ -135,9 +284,105 @@ export default async function NewProjectPage({
             <Button asChild variant="outline">
               <Link href="/dashboard/projects">SEO Audit</Link>
             </Button>
+
+            <Button asChild variant="outline">
+              <Link href="/dashboard/billing">Billing</Link>
+            </Button>
           </div>
         </div>
       </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Current Plan
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-3xl font-bold tracking-tight text-slate-950">
+              {formatPlanName(currentPlan)}
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Active account plan.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-[#d4af37]/50 bg-[#fff8df] shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+              Project Usage
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-3xl font-bold tracking-tight text-slate-950">
+              {currentProjectCount}
+              <span className="text-base font-semibold text-[#7a5b00]/70">
+                {" "}
+                / {projectLimit === null ? "∞" : projectLimit}
+              </span>
+            </p>
+
+            <p className="mt-2 text-sm text-[#7a5b00]/80">
+              {getLimitText(currentPlan)} allowed.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Limit Status
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-3xl font-bold tracking-tight text-slate-950">
+              {hasReachedLimit ? "Limit Reached" : "Available"}
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              {hasReachedLimit
+                ? "Upgrade needed to add more projects."
+                : "You can create another project."}
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {errorMessage ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {hasReachedLimit ? (
+        <section className="rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5 shadow-sm md:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a5b00]">
+                Plan Limit
+              </p>
+
+              <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                You reached your project limit.
+              </h2>
+
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#7a5b00]/80">
+                {getPlanUpgradeMessage(currentPlan)}
+              </p>
+            </div>
+
+            <Button asChild>
+              <Link href="/dashboard/billing">Request Upgrade</Link>
+            </Button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
@@ -156,12 +401,6 @@ export default async function NewProjectPage({
           </CardHeader>
 
           <CardContent className="p-5 md:p-6">
-            {errorMessage ? (
-              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-                {errorMessage}
-              </div>
-            ) : null}
-
             <form action={createProject} className="space-y-5">
               <div className="space-y-2">
                 <label
@@ -176,7 +415,8 @@ export default async function NewProjectPage({
                   name="name"
                   type="text"
                   placeholder="Example: RankCraft Web"
-                  className="h-12 w-full rounded-2xl border border-[#e6dcc8] bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10"
+                  disabled={hasReachedLimit}
+                  className="h-12 w-full rounded-2xl border border-[#e6dcc8] bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                   required
                 />
 
@@ -198,7 +438,8 @@ export default async function NewProjectPage({
                   name="domain"
                   type="text"
                   placeholder="example.com"
-                  className="h-12 w-full rounded-2xl border border-[#e6dcc8] bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10"
+                  disabled={hasReachedLimit}
+                  className="h-12 w-full rounded-2xl border border-[#e6dcc8] bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                   required
                 />
 
@@ -220,7 +461,9 @@ export default async function NewProjectPage({
               </div>
 
               <div className="flex flex-wrap gap-3 pt-2">
-                <Button type="submit">Create Project</Button>
+                <Button type="submit" disabled={hasReachedLimit}>
+                  {hasReachedLimit ? "Project Limit Reached" : "Create Project"}
+                </Button>
 
                 <Button asChild type="button" variant="outline">
                   <Link href="/dashboard">Cancel</Link>
