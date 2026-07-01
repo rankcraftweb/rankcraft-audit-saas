@@ -1,18 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 type RecommendationsPageProps = {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
 type Project = {
@@ -56,11 +47,8 @@ type RecommendationItem = {
   source: string;
 };
 
-function normalizeDomainForDisplay(domain: string) {
-  return domain
-    .replace("https://", "")
-    .replace("http://", "")
-    .replace(/\/$/, "");
+function normalizeDomain(domain: string) {
+  return domain.replace("https://", "").replace("http://", "").replace(/\/$/, "");
 }
 
 function formatNumber(value: number | null | undefined) {
@@ -68,46 +56,26 @@ function formatNumber(value: number | null | undefined) {
 }
 
 function formatCtr(ctr: number | null | undefined) {
-  if (ctr === null || ctr === undefined) {
-    return "--";
-  }
-
+  if (ctr === null || ctr === undefined) return "--";
   return `${(Number(ctr) * 100).toFixed(1)}%`;
 }
 
 function formatPosition(position: number | null | undefined) {
-  if (position === null || position === undefined) {
-    return "--";
-  }
-
+  if (position === null || position === undefined) return "--";
   return Number(position).toFixed(1);
 }
 
 function getPriorityClass(priority: string) {
-  if (priority === "High") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  if (priority === "Medium") {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
-  }
-
+  if (priority === "High") return "border-red-200 bg-red-50 text-red-700";
+  if (priority === "Medium") return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
   return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
 }
 
 function getCategoryClass(category: string) {
-  if (category.toLowerCase().includes("keyword")) {
-    return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
-  }
-
-  if (category.toLowerCase().includes("technical")) {
-    return "border-slate-300 bg-slate-100 text-slate-700";
-  }
-
-  if (category.toLowerCase().includes("metadata")) {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
+  const lower = category.toLowerCase();
+  if (lower.includes("keyword")) return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
+  if (lower.includes("technical")) return "border-slate-300 bg-slate-100 text-slate-700";
+  if (lower.includes("metadata")) return "border-blue-200 bg-blue-50 text-blue-700";
   return "border-[#e6dcc8] bg-white text-slate-600";
 }
 
@@ -115,33 +83,17 @@ function getLatestKeywordRange(rows: GscKeywordRow[]) {
   const latestRow = [...rows].sort((a, b) => {
     const aDate = new Date(a.created_at || a.end_date || 0).getTime();
     const bDate = new Date(b.created_at || b.end_date || 0).getTime();
-
     return bDate - aDate;
   })[0];
 
-  if (!latestRow?.start_date || !latestRow?.end_date) {
-    return null;
-  }
-
-  return {
-    startDate: latestRow.start_date,
-    endDate: latestRow.end_date,
-  };
+  if (!latestRow?.start_date || !latestRow?.end_date) return null;
+  return { startDate: latestRow.start_date, endDate: latestRow.end_date };
 }
 
 function getLatestKeywordRows(rows: GscKeywordRow[]) {
-  const latestRange = getLatestKeywordRange(rows);
-
-  if (!latestRange) {
-    return [];
-  }
-
-  return rows.filter((row) => {
-    return (
-      row.start_date === latestRange.startDate &&
-      row.end_date === latestRange.endDate
-    );
-  });
+  const range = getLatestKeywordRange(rows);
+  if (!range) return [];
+  return rows.filter((r) => r.start_date === range.startDate && r.end_date === range.endDate);
 }
 
 function getKeywordStatus(keyword: GscKeywordRow) {
@@ -150,26 +102,11 @@ function getKeywordStatus(keyword: GscKeywordRow) {
   const ctr = Number(keyword.ctr || 0);
   const position = Number(keyword.position || 0);
 
-  if (position > 0 && position <= 3) {
-    return "Ranking Well";
-  }
-
-  if (position > 3 && position <= 15) {
-    return "Opportunity";
-  }
-
-  if (impressions >= 10 && clicks === 0) {
-    return "Low CTR";
-  }
-
-  if (ctr < 0.02 && impressions >= 10) {
-    return "CTR Gap";
-  }
-
-  if (position > 15 && position <= 50) {
-    return "Needs Work";
-  }
-
+  if (position > 0 && position <= 3) return "Ranking Well";
+  if (position > 3 && position <= 15) return "Opportunity";
+  if (impressions >= 10 && clicks === 0) return "Low CTR";
+  if (ctr < 0.02 && impressions >= 10) return "CTR Gap";
+  if (position > 15 && position <= 50) return "Needs Work";
   return "Monitor";
 }
 
@@ -179,22 +116,14 @@ function getKeywordAction(keyword: GscKeywordRow) {
   const ctr = Number(keyword.ctr || 0);
   const position = Number(keyword.position || 0);
 
-  if (position > 3 && position <= 15) {
+  if (position > 3 && position <= 15)
     return "Improve the target page content, add internal links, and make sure the keyword intent is clearly matched on the page.";
-  }
-
-  if (impressions >= 10 && clicks === 0) {
+  if (impressions >= 10 && clicks === 0)
     return "Rewrite the title tag and meta description to make the search result more clickable.";
-  }
-
-  if (ctr < 0.02 && impressions >= 10) {
+  if (ctr < 0.02 && impressions >= 10)
     return "Improve the page snippet and make the title more specific to the search query.";
-  }
-
-  if (position > 15 && position <= 50) {
+  if (position > 15 && position <= 50)
     return "Strengthen the page with supporting content, better headings, and internal links from relevant pages.";
-  }
-
   return "Keep tracking this keyword and review again after more Search Console data is available.";
 }
 
@@ -207,43 +136,25 @@ function getKeywordPriority(keyword: GscKeywordRow): "High" | "Medium" | "Low" {
   if (
     (position >= 4 && position <= 15 && impressions >= 10) ||
     (impressions >= 25 && clicks === 0)
-  ) {
+  )
     return "High";
-  }
-
-  if (
-    (position > 15 && position <= 50) ||
-    (ctr < 0.02 && impressions >= 10)
-  ) {
-    return "Medium";
-  }
-
+  if ((position > 15 && position <= 50) || (ctr < 0.02 && impressions >= 10)) return "Medium";
   return "Low";
 }
 
-function getIssuePriority(
-  severity: string | null | undefined
-): "High" | "Medium" | "Low" {
-  if (severity === "high") {
-    return "High";
-  }
-
-  if (severity === "medium") {
-    return "Medium";
-  }
-
+function getIssuePriority(severity: string | null | undefined): "High" | "Medium" | "Low" {
+  if (severity === "high") return "High";
+  if (severity === "medium") return "Medium";
   return "Low";
 }
 
 function buildIssueRecommendations(issues: AuditIssue[]) {
   return issues.map((issue) => {
     const priority = getIssuePriority(issue.severity);
-
     return {
       id: `issue-${issue.id}`,
       title: issue.title,
-      description:
-        issue.description || "This SEO issue was detected in the latest audit.",
+      description: issue.description || "This SEO issue was detected in the latest audit.",
       priority,
       category: issue.category || "Technical SEO",
       impact:
@@ -252,9 +163,7 @@ function buildIssueRecommendations(issues: AuditIssue[]) {
           : priority === "Medium"
             ? "Can improve SEO quality and reduce technical weaknesses."
             : "Useful cleanup item for a stronger SEO foundation.",
-      action:
-        issue.recommendation ||
-        "Review this issue and apply the appropriate SEO fix.",
+      action: issue.recommendation || "Review this issue and apply the appropriate SEO fix.",
       source: "Audit issue",
     } satisfies RecommendationItem;
   });
@@ -264,7 +173,6 @@ function buildKeywordRecommendations(keywords: GscKeywordRow[]) {
   return keywords
     .filter((keyword) => {
       const status = getKeywordStatus(keyword);
-
       return (
         status === "Opportunity" ||
         status === "Low CTR" ||
@@ -279,11 +187,7 @@ function buildKeywordRecommendations(keywords: GscKeywordRow[]) {
       return {
         id: `keyword-${keyword.id}`,
         title: `Improve keyword: ${keyword.query}`,
-        description: `${status}. ${formatNumber(
-          keyword.impressions
-        )} impressions, ${formatNumber(keyword.clicks)} clicks, ${formatCtr(
-          keyword.ctr
-        )} CTR, average position ${formatPosition(keyword.position)}.`,
+        description: `${status}. ${formatNumber(keyword.impressions)} impressions, ${formatNumber(keyword.clicks)} clicks, ${formatCtr(keyword.ctr)} CTR, average position ${formatPosition(keyword.position)}.`,
         priority,
         category: "Keyword Opportunity",
         impact:
@@ -299,31 +203,21 @@ function buildKeywordRecommendations(keywords: GscKeywordRow[]) {
 }
 
 function sortRecommendations(recommendations: RecommendationItem[]) {
-  const priorityWeight = {
-    High: 3,
-    Medium: 2,
-    Low: 1,
-  };
-
-  return [...recommendations].sort((a, b) => {
-    return priorityWeight[b.priority] - priorityWeight[a.priority];
-  });
+  const priorityWeight = { High: 3, Medium: 2, Low: 1 };
+  return [...recommendations].sort(
+    (a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]
+  );
 }
 
-export default async function RecommendationsPage({
-  params,
-}: RecommendationsPageProps) {
+export default async function RecommendationsPage({ params }: RecommendationsPageProps) {
   const { id } = await params;
-
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -332,9 +226,7 @@ export default async function RecommendationsPage({
     .eq("user_id", user.id)
     .single();
 
-  if (projectError || !project) {
-    notFound();
-  }
+  if (projectError || !project) notFound();
 
   const currentProject = project as Project;
 
@@ -349,18 +241,14 @@ export default async function RecommendationsPage({
   const { data: issues } = latestAudit?.id
     ? await supabase
         .from("audit_issues")
-        .select(
-          "id, title, description, severity, category, recommendation, created_at"
-        )
+        .select("id, title, description, severity, category, recommendation, created_at")
         .eq("audit_id", latestAudit.id)
         .order("created_at", { ascending: true })
     : { data: [] };
 
   const { data: gscKeywordRows } = await supabase
     .from("gsc_keyword_rows")
-    .select(
-      "id, query, clicks, impressions, ctr, position, start_date, end_date, created_at"
-    )
+    .select("id, query, clicks, impressions, ctr, position, start_date, end_date, created_at")
     .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -377,243 +265,180 @@ export default async function RecommendationsPage({
     ...keywordRecommendations,
   ]).slice(0, 12);
 
-  const highCount = recommendations.filter((item) => {
-    return item.priority === "High";
-  }).length;
-
-  const mediumCount = recommendations.filter((item) => {
-    return item.priority === "Medium";
-  }).length;
-
-  const lowCount = recommendations.filter((item) => {
-    return item.priority === "Low";
-  }).length;
+  const highCount = recommendations.filter((r) => r.priority === "High").length;
+  const mediumCount = recommendations.filter((r) => r.priority === "Medium").length;
+  const lowCount = recommendations.filter((r) => r.priority === "Low").length;
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-3xl">
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/dashboard/projects/${currentProject.id}`}>
-                ← Back to Overview
-              </Link>
-            </Button>
+    <div className="space-y-5">
 
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-              Recommendations
-            </p>
-
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-              Prioritized action plan
-            </h1>
-
-            <p className="mt-2 text-sm text-slate-500">
-              {currentProject.name} ·{" "}
-              {normalizeDomainForDisplay(currentProject.domain)}
-            </p>
-
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
-              Review the highest-impact next actions based on the latest audit
-              issues and Google Search Console keyword data.
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
-            <Button asChild>
-              <Link href={`/dashboard/projects/${currentProject.id}/reports`}>
-                Report
-              </Link>
-            </Button>
-
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/projects/${currentProject.id}/audit`}>
-                Run Audit
-              </Link>
-            </Button>
-          </div>
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <Link
+            href={`/dashboard/projects/${currentProject.id}`}
+            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+          >
+            ← Overview
+          </Link>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            Prioritized action plan
+          </h1>
+          <p className="text-xs text-slate-500">
+            {currentProject.name} · {normalizeDomain(currentProject.domain)}
+          </p>
         </div>
-      </section>
+        <div className="flex gap-2">
+          <Link
+            href={`/dashboard/projects/${currentProject.id}/reports`}
+            className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
+          >
+            Report
+          </Link>
+          <Link
+            href={`/dashboard/projects/${currentProject.id}/audit`}
+            className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+          >
+            Run Audit
+          </Link>
+        </div>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Total Actions
-            </CardTitle>
-          </CardHeader>
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Total Actions
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {recommendations.length}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Recommended next steps</p>
+        </div>
 
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {recommendations.length}
-            </p>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-700">
+            High Priority
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {highCount}
+          </p>
+          <p className="mt-1 text-xs text-red-700/70">Fix first</p>
+        </div>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Recommended next steps
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-[#d4af37]/40 bg-[#fff8df] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+            Medium Priority
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {mediumCount}
+          </p>
+          <p className="mt-1 text-xs text-[#7a5b00]/70">Review next</p>
+        </div>
 
-        <Card className="rounded-2xl border-red-200 bg-red-50 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-red-700">
-              High Priority
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {highCount}
-            </p>
-
-            <p className="mt-1 text-sm text-red-700/80">Fix first</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-[#d4af37]/50 bg-[#fff8df] shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
-              Medium Priority
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {mediumCount}
-            </p>
-
-            <p className="mt-1 text-sm text-[#7a5b00]/80">Review next</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-[#e6dcc8] bg-[#faf7ef] shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Low Priority
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {lowCount}
-            </p>
-
-            <p className="mt-1 text-sm text-slate-500">Cleanup items</p>
-          </CardContent>
-        </Card>
-      </section>
+        <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Low Priority
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {lowCount}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Cleanup items</p>
+        </div>
+      </div>
 
       {recommendations.length === 0 ? (
-        <Card className="rounded-3xl border-dashed border-[#d4af37]/50 bg-white shadow-sm">
-          <CardContent className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#d4af37]/40 bg-[#111111] text-lg font-bold text-[#d4af37]">
-              ✓
-            </div>
-
-            <h2 className="mt-5 text-xl font-bold tracking-tight text-slate-950">
-              No recommendations yet
-            </h2>
-
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-              Run an SEO audit and sync Google Search Console keyword data
-              first. Once data is available, this page will show prioritized
-              technical fixes, CTR opportunities, and keyword actions.
-            </p>
-
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button asChild>
-                <Link href={`/dashboard/projects/${currentProject.id}/audit`}>
-                  Run Audit
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline">
-                <Link
-                  href={`/dashboard/projects/${currentProject.id}/keywords`}
-                >
-                  Keywords
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <section className="grid gap-4">
-          {recommendations.map((item, index) => (
-            <Card
-              key={item.id}
-              className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm"
+        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#d4af37]/40 bg-white p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#111111] text-sm font-bold text-[#d4af37]">
+            ✓
+          </div>
+          <p className="mt-4 text-sm font-semibold text-slate-950">
+            No recommendations yet
+          </p>
+          <p className="mt-2 max-w-sm text-xs leading-5 text-slate-500">
+            Run an SEO audit and sync Google Search Console keyword data
+            first. Once data is available, this page will show prioritized
+            technical fixes, CTR opportunities, and keyword actions.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/audit`}
+              className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
             >
-              <CardContent className="p-5 md:p-6">
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-3 py-1 text-xs font-semibold text-slate-600">
-                        #{index + 1}
-                      </span>
-
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPriorityClass(
-                          item.priority
-                        )}`}
-                      >
-                        {item.priority}
-                      </span>
-
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getCategoryClass(
-                          item.category
-                        )}`}
-                      >
-                        {item.category}
-                      </span>
-                    </div>
-
-                    <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
-                      {item.title}
-                    </h2>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      {item.description}
-                    </p>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Why this matters
-                        </p>
-
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          {item.impact}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a5b00]">
-                          Recommended action
-                        </p>
-
-                        <p className="mt-2 text-sm leading-6 text-[#7a5b00]/80">
-                          {item.action}
-                        </p>
-                      </div>
-                    </div>
+              Run Audit
+            </Link>
+            <Link
+              href={`/dashboard/projects/${currentProject.id}/keywords`}
+              className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+            >
+              Keywords
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {recommendations.map((item, index) => (
+            <div
+              key={item.id}
+              className="rounded-2xl border border-[#e6dcc8] bg-white p-5"
+            >
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                      #{index + 1}
+                    </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getPriorityClass(item.priority)}`}
+                    >
+                      {item.priority}
+                    </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getCategoryClass(item.category)}`}
+                    >
+                      {item.category}
+                    </span>
                   </div>
 
-                  <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4 xl:w-56">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Source
-                    </p>
+                  <h2 className="mt-3 text-base font-bold tracking-tight text-slate-950">
+                    {item.title}
+                  </h2>
+                  <p className="mt-1.5 text-xs leading-5 text-slate-500">
+                    {item.description}
+                  </p>
 
-                    <p className="mt-2 text-sm font-semibold text-slate-950">
-                      {item.source}
-                    </p>
+                  <div className="mt-3 grid gap-2.5 md:grid-cols-2">
+                    <div className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                        Why this matters
+                      </p>
+                      <p className="mt-1.5 text-xs leading-5 text-slate-600">
+                        {item.impact}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[#d4af37]/40 bg-[#fff8df] p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7a5b00]">
+                        Recommended action
+                      </p>
+                      <p className="mt-1.5 text-xs leading-5 text-[#7a5b00]/80">
+                        {item.action}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+
+                <div className="rounded-xl border border-[#e6dcc8] bg-white p-3 xl:w-44">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Source
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-950">
+                    {item.source}
+                  </p>
+                </div>
+              </div>
+            </div>
           ))}
-        </section>
+        </div>
       )}
     </div>
   );

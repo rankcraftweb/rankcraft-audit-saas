@@ -1,13 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 type Plan = {
   key: "starter" | "growth" | "agency";
@@ -32,7 +25,6 @@ type Subscription = {
 
 function buildUpgradeRequestLink(planName: string, userEmail?: string) {
   const subject = `RankCraft Audit ${planName} Plan Request`;
-
   const body = `Hi RankCraft Web,
 
 I would like to request access to the ${planName} plan for RankCraft Audit.
@@ -44,24 +36,16 @@ Please send me the next steps for billing and activation.
 
 Thank you.`;
 
-  return `mailto:rankcraftweb@gmail.com?subject=${encodeURIComponent(
-    subject
-  )}&body=${encodeURIComponent(body)}`;
+  return `mailto:rankcraftweb@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function formatPlanName(plan: string | null | undefined) {
-  if (!plan) {
-    return "Free";
-  }
-
+  if (!plan) return "Free";
   return plan.slice(0, 1).toUpperCase() + plan.slice(1);
 }
 
 function formatStatus(status: string | null | undefined) {
-  if (!status) {
-    return "Active";
-  }
-
+  if (!status) return "Active";
   return status
     .split("_")
     .map((word) => word.slice(0, 1).toUpperCase() + word.slice(1))
@@ -69,10 +53,7 @@ function formatStatus(status: string | null | undefined) {
 }
 
 function formatBillingMode(mode: string | null | undefined) {
-  if (!mode) {
-    return "Manual";
-  }
-
+  if (!mode) return "Manual";
   return mode.slice(0, 1).toUpperCase() + mode.slice(1);
 }
 
@@ -83,9 +64,7 @@ export default async function BillingPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: subscriptionData } = await supabase
     .from("subscriptions")
@@ -96,7 +75,7 @@ export default async function BillingPage() {
   let subscription = subscriptionData as Subscription | null;
 
   if (!subscription) {
-    const { data: createdSubscription } = await supabase
+    const { data: created } = await supabase
       .from("subscriptions")
       .insert({
         user_id: user.id,
@@ -107,7 +86,7 @@ export default async function BillingPage() {
       .select("id, user_id, plan, status, billing_mode, started_at, expires_at")
       .single();
 
-    subscription = createdSubscription as Subscription | null;
+    subscription = created as Subscription | null;
   }
 
   const currentPlan = subscription?.plan || "free";
@@ -179,232 +158,190 @@ export default async function BillingPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-3xl">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard">← Back to Dashboard</Link>
-            </Button>
+    <div className="space-y-5">
 
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-              Billing
-            </p>
-
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-              Plans and subscription
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Choose the plan you want to request. Billing is currently handled
-              manually while online payment checkout is being prepared.
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
-            <Button asChild>
-              <Link href="/dashboard/projects/new">Add Project</Link>
-            </Button>
-
-            <Button asChild variant="outline">
-              <Link href="/dashboard/projects">SEO Audit</Link>
-            </Button>
-          </div>
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <Link
+            href="/dashboard"
+            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+          >
+            ← Dashboard
+          </Link>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            Plans and subscription
+          </h1>
+          <p className="max-w-xl text-xs leading-5 text-slate-500">
+            Billing is currently handled manually while online payment checkout
+            is being prepared.
+          </p>
         </div>
-      </section>
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/projects/new"
+            className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
+          >
+            Add Project
+          </Link>
+          <Link
+            href="/dashboard/projects"
+            className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+          >
+            SEO Audit
+          </Link>
+        </div>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Current Plan
-            </CardTitle>
-          </CardHeader>
+      {/* Current plan stats */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Current Plan
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            {formatPlanName(currentPlan)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Active plan for this account</p>
+        </div>
 
-          <CardContent>
-            <p className="text-3xl font-bold tracking-tight text-slate-950">
-              {formatPlanName(currentPlan)}
-            </p>
+        <div className="rounded-2xl border border-[#d4af37]/40 bg-[#fff8df] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+            Status
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            {formatStatus(currentStatus)}
+          </p>
+          <p className="mt-1 text-xs text-[#7a5b00]/70">Subscription status</p>
+        </div>
 
-            <p className="mt-2 text-sm text-slate-500">
-              Active plan for this account.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Billing Mode
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            {formatBillingMode(currentBillingMode)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Manual until checkout is enabled</p>
+        </div>
+      </div>
 
-        <Card className="rounded-3xl border-[#d4af37]/50 bg-[#fff8df] shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
-              Status
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-bold tracking-tight text-slate-950">
-              {formatStatus(currentStatus)}
-            </p>
-
-            <p className="mt-2 text-sm text-[#7a5b00]/80">
-              Subscription status from Supabase.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Billing Mode
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-bold tracking-tight text-slate-950">
-              {formatBillingMode(currentBillingMode)}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">
-              Manual until online checkout is enabled.
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5 shadow-sm md:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      {/* MVP notice */}
+      <div className="rounded-2xl border border-[#d4af37]/40 bg-[#fff8df] px-5 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a5b00]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
               MVP Billing Mode
             </p>
-
-            <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+            <p className="mt-1 text-sm font-bold text-slate-950">
               Manual plan requests are active.
-            </h2>
-
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#7a5b00]/80">
-              PayMongo online payments are still being prepared. For now,
-              upgrade requests open an email so plans can be approved and billed
-              manually.
+            </p>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[#7a5b00]/80">
+              PayMongo online payments are still being prepared. Upgrade
+              requests open an email so plans can be approved manually.
             </p>
           </div>
-
-          <Button asChild variant="outline">
-            <Link href="mailto:rankcraftweb@gmail.com?subject=RankCraft%20Audit%20Billing%20Question">
-              Contact Billing
-            </Link>
-          </Button>
+          <Link
+            href="mailto:rankcraftweb@gmail.com?subject=RankCraft%20Audit%20Billing%20Question"
+            className="inline-flex h-8 shrink-0 items-center rounded-xl border border-[#d4af37]/40 bg-white px-4 text-xs font-semibold text-[#7a5b00] hover:bg-[#fff8df]"
+          >
+            Contact Billing
+          </Link>
         </div>
-      </section>
+      </div>
 
-      <section className="grid gap-5 lg:grid-cols-3">
+      {/* Plans */}
+      <div className="grid gap-3 lg:grid-cols-3">
         {plans.map((plan) => {
           const isCurrentPlan = currentPlan === plan.key;
 
           return (
-            <Card
+            <div
               key={plan.name}
-              className={`relative rounded-3xl bg-white shadow-sm ${
-                plan.badge
-                  ? "border-[#d4af37]/70 ring-4 ring-[#d4af37]/10"
-                  : "border-[#e6dcc8]"
+              className={`relative rounded-2xl bg-white p-5 ${
+                plan.badge ? "border-2 border-[#d4af37]/60" : "border border-[#e6dcc8]"
               }`}
             >
               {isCurrentPlan ? (
-                <div className="absolute left-5 top-5 rounded-full border border-[#2b2413] bg-[#111111] px-3 py-1 text-xs font-semibold text-[#d4af37]">
+                <div className="absolute left-5 top-5 rounded-full border border-[#2b2413] bg-[#111111] px-2.5 py-0.5 text-[10px] font-semibold text-[#d4af37]">
                   Current Plan
                 </div>
               ) : null}
 
               {plan.badge ? (
-                <div className="absolute right-5 top-5 rounded-full border border-[#d4af37]/50 bg-[#fff8df] px-3 py-1 text-xs font-semibold text-[#7a5b00]">
+                <div className="absolute right-5 top-5 rounded-full border border-[#d4af37]/50 bg-[#fff8df] px-2.5 py-0.5 text-[10px] font-semibold text-[#7a5b00]">
                   {plan.badge}
                 </div>
               ) : null}
 
-              <CardHeader className="border-b border-[#eee5d4] p-5 pt-14 md:p-6 md:pt-14">
-                <CardTitle className="text-xl font-bold text-slate-950">
-                  {plan.name}
-                </CardTitle>
-
-                <p className="max-w-sm text-sm leading-6 text-slate-500">
+              <div className={isCurrentPlan || plan.badge ? "pt-8" : ""}>
+                <p className="text-base font-bold text-slate-950">{plan.name}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
                   {plan.description}
                 </p>
-              </CardHeader>
+              </div>
 
-              <CardContent className="flex min-h-[430px] flex-col p-5 md:p-6">
-                <div
-                  className={
-                    plan.badge
-                      ? "rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5"
-                      : "rounded-3xl border border-[#e6dcc8] bg-[#faf7ef] p-5"
-                  }
-                >
-                  <div className="flex items-end gap-2">
-                    <p className="text-5xl font-bold tracking-tight text-slate-950">
-                      {plan.price}
-                    </p>
-
-                    <p className="pb-2 text-sm text-slate-500">
-                      {plan.period}
-                    </p>
-                  </div>
-
-                  <p className="mt-3 text-xs leading-5 text-slate-500">
-                    Manual billing while online checkout is pending.
+              <div className="mt-4 rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-4">
+                <div className="flex items-end gap-1.5">
+                  <p className="text-3xl font-bold tracking-tight text-slate-950">
+                    {plan.price}
                   </p>
+                  <p className="pb-1 text-xs text-slate-500">{plan.period}</p>
                 </div>
+                <p className="mt-1.5 text-[11px] text-slate-500">
+                  Manual billing while checkout is pending.
+                </p>
+              </div>
 
-                <div className="mt-6 space-y-3">
-                  {plan.features.map((feature) => (
-                    <div key={feature} className="flex gap-3">
-                      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/50 bg-[#fff8df] text-xs font-bold text-[#7a5b00]">
-                        ✓
-                      </div>
-
-                      <p className="text-sm leading-6 text-slate-600">
-                        {feature}
-                      </p>
+              <div className="mt-4 space-y-2">
+                {plan.features.map((feature) => (
+                  <div key={feature} className="flex gap-2">
+                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/50 bg-[#fff8df] text-[9px] font-bold text-[#7a5b00]">
+                      ✓
                     </div>
-                  ))}
-                </div>
+                    <p className="text-xs leading-5 text-slate-600">{feature}</p>
+                  </div>
+                ))}
+              </div>
 
-                <div className="mt-auto pt-8">
-                  {isCurrentPlan ? (
-                    <Button disabled className="w-full">
-                      Current Plan
-                    </Button>
-                  ) : (
-                    <Button asChild className="w-full">
-                      <Link
-                        href={buildUpgradeRequestLink(plan.name, user.email)}
-                      >
-                        {plan.cta}
-                      </Link>
-                    </Button>
-                  )}
-
-                  <p className="mt-3 text-center text-xs text-slate-500">
-                    This sends a manual upgrade request to RankCraft Web.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="mt-5">
+                {isCurrentPlan ? (
+                  <button
+                    disabled
+                    className="flex h-9 w-full items-center justify-center rounded-xl bg-slate-200 text-xs font-semibold text-slate-500"
+                  >
+                    Current Plan
+                  </button>
+                ) : (
+                  <Link
+                    href={buildUpgradeRequestLink(plan.name, user.email)}
+                    className="flex h-9 w-full items-center justify-center rounded-xl bg-[#111111] text-xs font-semibold text-white transition hover:bg-black"
+                  >
+                    {plan.cta}
+                  </Link>
+                )}
+                <p className="mt-2 text-center text-[10px] text-slate-500">
+                  Sends a manual upgrade request to RankCraft Web.
+                </p>
+              </div>
+            </div>
           );
         })}
-      </section>
+      </div>
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_380px]">
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+      {/* Included + payment setup */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white">
+          <div className="border-b border-[#eee5d4] px-5 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
               Included
             </p>
-
-            <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+            <p className="mt-0.5 text-sm font-bold text-slate-950">
               What each plan supports
-            </CardTitle>
-          </CardHeader>
+            </p>
+          </div>
 
-          <CardContent className="grid gap-3 p-5 md:grid-cols-2 md:p-6">
+          <div className="grid gap-3 p-5 md:grid-cols-2">
             {[
               {
                 title: "SEO audit runner",
@@ -429,55 +366,55 @@ export default async function BillingPage() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4"
+                className="rounded-xl border border-[#e6dcc8] bg-[#faf7ef] p-3.5"
               >
-                <p className="font-semibold text-slate-950">{item.title}</p>
-
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="text-xs font-semibold text-slate-950">{item.title}</p>
+                <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
                   {item.description}
                 </p>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
-          <CardHeader className="border-b border-white/10 p-5 md:p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+        <div className="rounded-2xl border border-[#2b2413] bg-[#111111] text-white">
+          <div className="border-b border-white/10 px-5 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
               Payment Setup
             </p>
-
-            <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+            <p className="mt-0.5 text-sm font-bold text-white">
               Checkout will be added later.
-            </CardTitle>
-          </CardHeader>
+            </p>
+          </div>
 
-          <CardContent className="space-y-4 p-5 md:p-6">
+          <div className="space-y-2.5 p-4">
             {billingNotes.map((note) => (
               <div
                 key={note.title}
-                className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                className="rounded-xl border border-white/10 bg-white/5 p-3"
               >
-                <p className="text-sm font-semibold text-white">
-                  {note.title}
-                </p>
-
-                <p className="mt-2 text-sm leading-6 text-slate-300">
+                <p className="text-xs font-semibold text-white">{note.title}</p>
+                <p className="mt-1 text-[11px] leading-4 text-slate-300">
                   {note.description}
                 </p>
               </div>
             ))}
 
-            <Button asChild className="w-full">
-              <Link href="/dashboard/projects">Open SEO Audit</Link>
-            </Button>
-
-            <Button asChild variant="outline" className="w-full bg-transparent">
-              <Link href="/dashboard">Back to Dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
+            <Link
+              href="/dashboard/projects"
+              className="flex h-9 items-center justify-center rounded-xl bg-[#d4af37] text-xs font-semibold text-black transition hover:bg-[#c9a42e]"
+            >
+              Open SEO Audit
+            </Link>
+            <Link
+              href="/dashboard"
+              className="flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs font-semibold text-white transition hover:bg-white/10"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

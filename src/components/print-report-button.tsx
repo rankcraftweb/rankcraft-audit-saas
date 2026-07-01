@@ -1,15 +1,17 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-
 export default function PrintReportButton() {
   function handlePrint() {
     window.print();
   }
 
   return (
-    <Button onClick={handlePrint}>
+    <button
+      type="button"
+      onClick={handlePrint}
+      className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white transition hover:bg-black"
+    >
       Export / Print Report
-    </Button>
+    </button>
   );
 }

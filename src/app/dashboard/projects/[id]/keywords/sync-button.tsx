@@ -7,9 +7,7 @@ type KeywordsSyncButtonProps = {
   projectId: string;
 };
 
-export default function KeywordsSyncButton({
-  projectId,
-}: KeywordsSyncButtonProps) {
+export default function KeywordsSyncButton({ projectId }: KeywordsSyncButtonProps) {
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
   const [message, setMessage] = useState("");
@@ -21,12 +19,8 @@ export default function KeywordsSyncButton({
 
       const response = await fetch("/api/gsc/keywords", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          projectId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
       });
 
       const data = await response.json();
@@ -49,18 +43,18 @@ export default function KeywordsSyncButton({
   }
 
   return (
-    <div className="flex flex-col items-start gap-2 sm:items-end">
+    <div className="flex flex-col items-start gap-1.5 sm:items-end">
       <button
         type="button"
         onClick={handleSync}
         disabled={isSyncing}
-        className="inline-flex h-10 items-center justify-center rounded-2xl bg-[#111111] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2b2413] disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSyncing ? "Syncing..." : "Sync GSC Data"}
       </button>
 
       {message ? (
-        <p className="max-w-[280px] text-left text-xs leading-5 text-slate-500 sm:text-right">
+        <p className="max-w-[260px] text-left text-[11px] leading-4 text-slate-500 sm:text-right">
           {message}
         </p>
       ) : null}

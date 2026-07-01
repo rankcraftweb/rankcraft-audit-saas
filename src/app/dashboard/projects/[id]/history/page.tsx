@@ -1,26 +1,15 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type HistoryPageProps = {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
+};
+
+type Project = {
+  id: string;
+  name: string;
+  domain: string;
 };
 
 type AuditRun = {
@@ -36,161 +25,109 @@ type AuditIssue = {
   severity: string | null;
 };
 
-function formatDate(date: string | null | undefined) {
-  if (!date) {
-    return "No date";
-  }
+function normalizeDomain(domain: string) {
+  return domain.replace("https://", "").replace("http://", "").replace(/\/$/, "");
+}
 
+function formatDate(date: string | null | undefined) {
+  if (!date) return "No date";
   return new Date(date).toLocaleString();
 }
 
 function getScoreStatus(score: number | null | undefined) {
-  if (score === null || score === undefined) {
-    return "Not scored";
-  }
-
-  if (score >= 90) {
-    return "Strong";
-  }
-
-  if (score >= 70) {
-    return "Needs work";
-  }
-
+  if (score === null || score === undefined) return "Not scored";
+  if (score >= 90) return "Strong";
+  if (score >= 70) return "Needs work";
   return "Needs attention";
 }
 
 function getScoreBadgeClass(score: number | null | undefined) {
-  if (score === null || score === undefined) {
-    return "border-slate-200 bg-slate-50 text-slate-600";
-  }
-
-  if (score >= 90) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (score >= 70) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return "border-rose-200 bg-rose-50 text-rose-700";
+  if (score === null || score === undefined)
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-500";
+  if (score >= 90) return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
+  if (score >= 70) return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-red-200 bg-red-50 text-red-700";
 }
 
 function getStatusClass(status: string | null | undefined) {
-  if (status === "completed") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "running" || status === "pending") {
+  if (status === "completed") return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
+  if (status === "running" || status === "pending")
     return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
-  if (status === "failed") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  if (status === "failed") return "border-red-200 bg-red-50 text-red-700";
+  return "border-[#e6dcc8] bg-[#faf7ef] text-slate-500";
 }
 
 function getIssueCounts(auditId: string, issues: AuditIssue[]) {
   const auditIssues = issues.filter((issue) => issue.audit_id === auditId);
-
   return {
     total: auditIssues.length,
-    high: auditIssues.filter((issue) => issue.severity === "high").length,
-    medium: auditIssues.filter((issue) => issue.severity === "medium").length,
-    low: auditIssues.filter((issue) => issue.severity === "low").length,
+    high: auditIssues.filter((i) => i.severity === "high").length,
+    medium: auditIssues.filter((i) => i.severity === "medium").length,
+    low: auditIssues.filter((i) => i.severity === "low").length,
   };
 }
 
 function getAverageScore(audits: AuditRun[]) {
-  const scoredAudits = audits.filter((audit) => {
-    return audit.score !== null && audit.score !== undefined;
-  });
-
-  if (scoredAudits.length === 0) {
-    return null;
-  }
-
-  const total = scoredAudits.reduce((sum, audit) => {
-    return sum + Number(audit.score || 0);
-  }, 0);
-
-  return Math.round(total / scoredAudits.length);
+  const scored = audits.filter((a) => a.score !== null && a.score !== undefined);
+  if (scored.length === 0) return null;
+  const total = scored.reduce((sum, a) => sum + Number(a.score || 0), 0);
+  return Math.round(total / scored.length);
 }
 
 function getBestScore(audits: AuditRun[]) {
   const scores = audits
-    .map((audit) => audit.score)
-    .filter((score) => score !== null && score !== undefined) as number[];
-
-  if (scores.length === 0) {
-    return null;
-  }
-
+    .map((a) => a.score)
+    .filter((s) => s !== null && s !== undefined) as number[];
+  if (scores.length === 0) return null;
   return Math.max(...scores);
 }
 
 function getLatestScoreChange(audits: AuditRun[]) {
-  if (audits.length < 2) {
-    return null;
-  }
-
+  if (audits.length < 2) return null;
   const latest = audits[0]?.score;
   const previous = audits[1]?.score;
-
-  if (
-    latest === null ||
-    latest === undefined ||
-    previous === null ||
-    previous === undefined
-  ) {
+  if (latest === null || latest === undefined || previous === null || previous === undefined)
     return null;
-  }
-
   return Number(latest) - Number(previous);
 }
 
 function formatScoreChange(change: number | null) {
-  if (change === null) {
-    return "No comparison yet";
-  }
-
-  if (change > 0) {
-    return `+${change} from previous audit`;
-  }
-
-  if (change < 0) {
-    return `${change} from previous audit`;
-  }
-
+  if (change === null) return "No comparison yet";
+  if (change > 0) return `+${change} from previous audit`;
+  if (change < 0) return `${change} from previous audit`;
   return "No score change";
 }
 
 export default async function ProjectHistoryPage({ params }: HistoryPageProps) {
   const { id } = await params;
-
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id, name, domain")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
-  if (projectError || !project) {
-    notFound();
-  }
+  if (projectError || !project) notFound();
+
+  const currentProject = project as Project;
 
   const { data: audits } = await supabase
     .from("audits")
     .select("id, score, status, created_at")
-    .eq("project_id", project.id)
+    .eq("project_id", currentProject.id)
     .order("created_at", { ascending: false })
     .limit(50);
 
   const auditList = (audits || []) as AuditRun[];
-  const auditIds = auditList.map((audit) => audit.id);
+  const auditIds = auditList.map((a) => a.id);
 
   const { data: auditIssues } =
     auditIds.length > 0
@@ -208,297 +145,230 @@ export default async function ProjectHistoryPage({ params }: HistoryPageProps) {
   const scoreChange = getLatestScoreChange(auditList);
 
   const totalIssues = issueList.length;
-  const highIssues = issueList.filter((issue) => issue.severity === "high")
-    .length;
+  const highIssues = issueList.filter((i) => i.severity === "high").length;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-5">
+
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Audit Timeline
-          </p>
-          <h2 className="mt-1 text-3xl font-bold tracking-tight">
-            Audit History
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Review previous audit runs, score movement, and issue volume for{" "}
-            {project.name}.
+          <Link
+            href={`/dashboard/projects/${currentProject.id}`}
+            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+          >
+            ← Overview
+          </Link>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            Audit history
+          </h1>
+          <p className="text-xs text-slate-500">
+            {currentProject.name} · {normalizeDomain(currentProject.domain)}
           </p>
         </div>
-
-        <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}`}>Overview</Link>
-          </Button>
-
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}/recommendations`}>
-              Recommendations
-            </Link>
-          </Button>
-
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/projects/${project.id}/reports`}>
-              Report
-            </Link>
-          </Button>
-
-          <Button asChild>
-            <Link href={`/dashboard/projects/${project.id}/audit`}>
-              Run New Audit
-            </Link>
-          </Button>
+        <div className="flex gap-2">
+          <Link
+            href={`/dashboard/projects/${currentProject.id}/recommendations`}
+            className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+          >
+            Recommendations
+          </Link>
+          <Link
+            href={`/dashboard/projects/${currentProject.id}/audit`}
+            className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
+          >
+            Run New Audit
+          </Link>
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-[2rem] border bg-white shadow-sm">
-        <div className="relative p-8">
-          <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-100 blur-3xl" />
-          <div className="absolute right-32 top-10 h-40 w-40 rounded-full bg-emerald-100 blur-3xl" />
-          <div className="absolute bottom-0 left-1/2 h-36 w-36 rounded-full bg-amber-100 blur-3xl" />
-
-          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-5">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  {project.domain}
-                </p>
-                <h1 className="mt-2 max-w-3xl text-4xl font-bold tracking-tight">
-                  Track SEO audit progress over time.
-                </h1>
-              </div>
-
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Use this page to compare recent audit scores, review previous
-                issue counts, and confirm whether fixes are improving the
-                project after each scan.
+      {/* Latest audit summary */}
+      <div className="rounded-2xl border border-[#e6dcc8] bg-[#111111] p-5 text-white">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+              Latest Audit
+            </p>
+            <p className="mt-1 text-lg font-bold tracking-tight text-white">
+              Score {latestAudit?.score ?? "--"}
+            </p>
+            <p className="mt-2 text-xs text-slate-300">
+              {formatDate(latestAudit?.created_at)}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400">
+                Status
               </p>
-
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                  {auditList.length} audit run(s)
-                </span>
-
-                <span
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${getScoreBadgeClass(
-                    latestAudit?.score
-                  )}`}
-                >
-                  Latest score: {latestAudit?.score ?? "--"}
-                </span>
-
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                  {formatScoreChange(scoreChange)}
-                </span>
-              </div>
+              <p className="mt-1 text-xs font-semibold capitalize text-white">
+                {latestAudit?.status || "No audit yet"}
+              </p>
             </div>
-
-            <Card className="border-slate-200 bg-background/90 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Latest Audit</CardTitle>
-              </CardHeader>
-
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Score</span>
-                  <span className="font-medium">
-                    {latestAudit?.score ?? "--"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Status</span>
-                  <span className="font-medium capitalize">
-                    {latestAudit?.status || "No audit yet"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Date</span>
-                  <span className="font-medium">
-                    {formatDate(latestAudit?.created_at)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-6">
-                  <span className="text-muted-foreground">Score Movement</span>
-                  <span className="font-medium">
-                    {formatScoreChange(scoreChange)}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400">
+                Movement
+              </p>
+              <p className="mt-1 text-xs font-semibold text-white">
+                {formatScoreChange(scoreChange)}
+              </p>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Audit Runs",
-            value: auditList.length,
-            helper: "Saved scans",
-            className: "border-slate-200 bg-white",
-          },
-          {
-            label: "Average Score",
-            value: averageScore ?? "--",
-            helper: "Across saved audits",
-            className: "border-blue-200 bg-blue-50",
-          },
-          {
-            label: "Best Score",
-            value: bestScore ?? "--",
-            helper: "Highest recorded score",
-            className: "border-emerald-200 bg-emerald-50",
-          },
-          {
-            label: "High Issues",
-            value: highIssues,
-            helper: `${totalIssues} total issue records`,
-            className: "border-rose-200 bg-rose-50",
-          },
-        ].map((item) => (
-          <Card key={item.label} className={`shadow-sm ${item.className}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{item.label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold tracking-tight">{item.value}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {item.helper}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Audit Runs
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {auditList.length}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Saved scans</p>
+        </div>
 
+        <div className="rounded-2xl border border-[#d4af37]/40 bg-[#fff8df] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+            Average Score
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {averageScore ?? "--"}
+          </p>
+          <p className="mt-1 text-xs text-[#7a5b00]/70">Across saved audits</p>
+        </div>
+
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Best Score
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {bestScore ?? "--"}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Highest recorded</p>
+        </div>
+
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            High Issues
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            {highIssues}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {totalIssues} total issue records
+          </p>
+        </div>
+      </div>
+
+      {/* Audit runs table */}
       {auditList.length === 0 ? (
-        <Card className="border-dashed bg-slate-50 shadow-sm">
-          <CardContent className="flex min-h-[340px] flex-col items-center justify-center p-10 text-center">
-            <div className="rounded-full border bg-white px-4 py-2 text-sm font-medium text-muted-foreground">
-              No audit history yet
-            </div>
-
-            <h3 className="mt-5 text-2xl font-bold tracking-tight">
-              Run the first audit for this project
-            </h3>
-
-            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Audit runs will appear here after you scan this project. Each run
-              will show the score, status, date, and issue count.
-            </p>
-
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button asChild>
-                <Link href={`/dashboard/projects/${project.id}/audit`}>
-                  Run Audit
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/projects/${project.id}`}>
-                  Back to Overview
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#d4af37]/40 bg-white p-8 text-center">
+          <p className="text-sm font-semibold text-slate-950">
+            No audit history yet
+          </p>
+          <p className="mt-2 max-w-xs text-xs leading-5 text-slate-500">
+            Audit runs will appear here after you scan this project, showing
+            score, status, date, and issue count.
+          </p>
+          <Link
+            href={`/dashboard/projects/${currentProject.id}/audit`}
+            className="mt-5 inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
+          >
+            Run Audit
+          </Link>
+        </div>
       ) : (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle>Previous Audit Runs</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Latest audit scans saved for this project.
-                </p>
-              </div>
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white">
+          <div className="border-b border-[#eee5d4] px-5 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              Timeline
+            </p>
+            <p className="mt-0.5 text-sm font-bold text-slate-950">
+              Previous audit runs
+            </p>
+          </div>
 
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/dashboard/projects/${project.id}/audit`}>
-                  Run New Audit
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            <div className="overflow-x-auto rounded-2xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Score Health</TableHead>
-                    <TableHead className="text-center">Issues</TableHead>
-                    <TableHead className="text-center">High</TableHead>
-                    <TableHead className="text-center">Medium</TableHead>
-                    <TableHead className="text-center">Low</TableHead>
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {auditList.map((audit) => {
-                    const issueCounts = getIssueCounts(audit.id, issueList);
-
-                    return (
-                      <TableRow key={audit.id}>
-                        <TableCell className="min-w-[190px] font-medium">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-xs">
+              <thead>
+                <tr className="border-b border-[#eee5d4] bg-[#faf7ef]">
+                  <th className="px-5 py-2.5 text-left font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Date
+                  </th>
+                  <th className="px-3 py-2.5 text-left font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Status
+                  </th>
+                  <th className="px-3 py-2.5 text-left font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Score
+                  </th>
+                  <th className="px-3 py-2.5 text-left font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Health
+                  </th>
+                  <th className="px-3 py-2.5 text-center font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Issues
+                  </th>
+                  <th className="px-3 py-2.5 text-center font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    High
+                  </th>
+                  <th className="px-3 py-2.5 text-center font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Medium
+                  </th>
+                  <th className="px-3 py-2.5 text-center font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Low
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#eee5d4]">
+                {auditList.map((audit) => {
+                  const counts = getIssueCounts(audit.id, issueList);
+                  return (
+                    <tr key={audit.id} className="hover:bg-[#faf7ef]">
+                      <td className="px-5 py-2.5">
+                        <Link
+                          href={`/dashboard/projects/${currentProject.id}/history/${audit.id}`}
+                          className="font-medium text-slate-950 hover:text-[#7a5b00] hover:underline"
+                        >
                           {formatDate(audit.created_at)}
-                        </TableCell>
-
-                        <TableCell>
-                          <span
-                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium capitalize ${getStatusClass(
-                              audit.status
-                            )}`}
-                          >
-                            {audit.status || "unknown"}
-                          </span>
-                        </TableCell>
-
-                        <TableCell>
-                          <span className="text-lg font-bold">
-                            {audit.score ?? "--"}
-                          </span>
-                        </TableCell>
-
-                        <TableCell>
-                          <span
-                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getScoreBadgeClass(
-                              audit.score
-                            )}`}
-                          >
-                            {getScoreStatus(audit.score)}
-                          </span>
-                        </TableCell>
-
-                        <TableCell className="text-center">
-                          {issueCounts.total}
-                        </TableCell>
-
-                        <TableCell className="text-center text-rose-700">
-                          {issueCounts.high}
-                        </TableCell>
-
-                        <TableCell className="text-center text-amber-700">
-                          {issueCounts.medium}
-                        </TableCell>
-
-                        <TableCell className="text-center text-slate-600">
-                          {issueCounts.low}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${getStatusClass(audit.status)}`}
+                        >
+                          {audit.status || "unknown"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-sm font-bold text-slate-950">
+                        {audit.score ?? "--"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getScoreBadgeClass(audit.score)}`}
+                        >
+                          {getScoreStatus(audit.score)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-medium text-slate-950">
+                        {counts.total}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-medium text-red-700">
+                        {counts.high}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-medium text-amber-700">
+                        {counts.medium}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-medium text-slate-500">
+                        {counts.low}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );
