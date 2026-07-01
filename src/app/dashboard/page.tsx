@@ -1,13 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 type Project = {
   id: string;
@@ -30,12 +23,10 @@ type KeywordRow = {
   project_id: string;
   clicks: number | null;
   impressions: number | null;
-  ctr: number | null;
-  position: number | null;
   created_at: string | null;
 };
 
-type DashboardWebsite = {
+type DashboardItem = {
   project: Project;
   latestAudit: AuditRow | null;
   keywordCount: number;
@@ -43,10 +34,7 @@ type DashboardWebsite = {
 };
 
 function formatDate(date: string | null | undefined) {
-  if (!date) {
-    return "No scan yet";
-  }
-
+  if (!date) return "No scan yet";
   return new Date(date).toLocaleDateString();
 }
 
@@ -62,34 +50,19 @@ function normalizeDomain(domain: string) {
 }
 
 function getScoreLabel(score: number | null | undefined) {
-  if (score === null || score === undefined) {
-    return "Not scanned";
-  }
-
-  if (score >= 90) {
-    return "Strong";
-  }
-
-  if (score >= 70) {
-    return "Needs improvement";
-  }
-
+  if (score === null || score === undefined) return "Not scanned";
+  if (score >= 90) return "Strong";
+  if (score >= 70) return "Needs work";
   return "Needs attention";
 }
 
-function getScoreClass(score: number | null | undefined) {
-  if (score === null || score === undefined) {
-    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-600";
-  }
-
-  if (score >= 90) {
+function getScoreBadgeClass(score: number | null | undefined) {
+  if (score === null || score === undefined)
+    return "border-[#e6dcc8] bg-[#faf7ef] text-slate-500";
+  if (score >= 90)
     return "border-[#d4af37]/50 bg-[#fff8df] text-[#7a5b00]";
-  }
-
-  if (score >= 70) {
+  if (score >= 70)
     return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
   return "border-red-200 bg-red-50 text-red-700";
 }
 
@@ -100,9 +73,7 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: projects } = await supabase
     .from("projects")
@@ -111,7 +82,7 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false });
 
   const projectList = (projects || []) as Project[];
-  const projectIds = projectList.map((project) => project.id);
+  const projectIds = projectList.map((p) => p.id);
 
   const { data: audits } =
     projectIds.length > 0
@@ -126,31 +97,23 @@ export default async function DashboardPage() {
     projectIds.length > 0
       ? await supabase
           .from("gsc_keyword_rows")
-          .select(
-            "id, project_id, clicks, impressions, ctr, position, created_at"
-          )
+          .select("id, project_id, clicks, impressions, created_at")
           .in("project_id", projectIds)
-          .order("created_at", { ascending: false })
       : { data: [] };
 
   const auditList = (audits || []) as AuditRow[];
   const keywordList = (keywordRows || []) as KeywordRow[];
 
-  const dashboardWebsites: DashboardWebsite[] = projectList.map((project) => {
-    const projectAudits = auditList.filter((audit) => {
-      return audit.project_id === project.id;
-    });
-
+  const dashboardItems: DashboardItem[] = projectList.map((project) => {
+    const projectAudits = auditList.filter((a) => a.project_id === project.id);
     const latestAudit = projectAudits[0] || null;
-
-    const projectKeywords = keywordList.filter((keyword) => {
-      return keyword.project_id === project.id;
-    });
-
-    const totalImpressions = projectKeywords.reduce((sum, keyword) => {
-      return sum + Number(keyword.impressions || 0);
-    }, 0);
-
+    const projectKeywords = keywordList.filter(
+      (k) => k.project_id === project.id
+    );
+    const totalImpressions = projectKeywords.reduce(
+      (sum, k) => sum + Number(k.impressions || 0),
+      0
+    );
     return {
       project,
       latestAudit,
@@ -159,273 +122,257 @@ export default async function DashboardPage() {
     };
   });
 
-  const totalProjects = dashboardWebsites.length;
-
-  const scannedProjects = dashboardWebsites.filter((item) => {
-    return item.latestAudit;
-  }).length;
-
+  const totalProjects = dashboardItems.length;
+  const scannedProjects = dashboardItems.filter((i) => i.latestAudit).length;
   const averageSeoScore =
     scannedProjects > 0
       ? Math.round(
-          dashboardWebsites.reduce((sum, item) => {
-            return sum + Number(item.latestAudit?.score || 0);
-          }, 0) / scannedProjects
+          dashboardItems.reduce(
+            (sum, i) => sum + Number(i.latestAudit?.score || 0),
+            0
+          ) / scannedProjects
         )
       : null;
+  const totalKeywordRows = dashboardItems.reduce(
+    (sum, i) => sum + i.keywordCount,
+    0
+  );
+  const totalImpressions = dashboardItems.reduce(
+    (sum, i) => sum + i.totalImpressions,
+    0
+  );
 
-  const totalKeywordRows = dashboardWebsites.reduce((sum, item) => {
-    return sum + item.keywordCount;
-  }, 0);
-
-  const totalImpressions = dashboardWebsites.reduce((sum, item) => {
-    return sum + item.totalImpressions;
-  }, 0);
-
-  const recentWebsites = dashboardWebsites.slice(0, 5);
+  const recentItems = dashboardItems.slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-              Dashboard
-            </p>
+    <div className="space-y-5">
 
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-              SEO audit control center
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Add client websites, review audit activity, and jump into the SEO
-              audit workflow when you are ready to scan, review, and report.
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
-            <Button asChild>
-              <Link href="/dashboard/projects/new">Add Project</Link>
-            </Button>
-
-            <Button asChild variant="outline">
-              <Link href="/dashboard/projects">SEO Audit</Link>
-            </Button>
-          </div>
+      {/* Page header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+            Dashboard
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            SEO audit control center
+          </h1>
         </div>
-      </section>
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/projects/new"
+            className="inline-flex h-9 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white transition hover:bg-black"
+          >
+            Add Project
+          </Link>
+          <Link
+            href="/dashboard/projects"
+            className="inline-flex h-9 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-[#faf7ef]"
+          >
+            SEO Audit
+          </Link>
+        </div>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Projects
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {totalProjects}
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          {
+            label: "Projects",
+            value: totalProjects,
+            sub: "Client websites added",
+            className: "border-[#e6dcc8] bg-white",
+            labelClass: "text-slate-500",
+          },
+          {
+            label: "Scanned",
+            value: scannedProjects,
+            sub: "With audit results",
+            className: "border-[#d4af37]/40 bg-[#fff8df]",
+            labelClass: "text-[#7a5b00]",
+          },
+          {
+            label: "Avg. SEO Score",
+            value: averageSeoScore ?? "--",
+            sub: "Across scanned sites",
+            className: "border-[#e6dcc8] bg-white",
+            labelClass: "text-slate-500",
+          },
+          {
+            label: "Keyword Rows",
+            value: formatNumber(totalKeywordRows),
+            sub: `${formatNumber(totalImpressions)} impressions`,
+            className: "border-[#e6dcc8] bg-white",
+            labelClass: "text-slate-500",
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className={`rounded-2xl border p-4 ${stat.className}`}
+          >
+            <p
+              className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${stat.labelClass}`}
+            >
+              {stat.label}
             </p>
-
-            <p className="mt-2 text-sm text-slate-500">Client websites added</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-[#d4af37]/40 bg-[#fff8df] shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
-              Scanned
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {scannedProjects}
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+              {stat.value}
             </p>
+            <p className="mt-1 text-xs text-slate-500">{stat.sub}</p>
+          </div>
+        ))}
+      </div>
 
-            <p className="mt-2 text-sm text-[#7a5b00]/80">With audit results</p>
-          </CardContent>
-        </Card>
+      {/* Main grid */}
+      <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
 
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Avg. SEO Score
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {averageSeoScore ?? "--"}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">Across scanned sites</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Search Data
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-4xl font-bold tracking-tight text-slate-950">
-              {formatNumber(totalKeywordRows)}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">
-              {formatNumber(totalImpressions)} impressions
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="flex flex-col gap-4 border-b border-[#eee5d4] p-5 md:flex-row md:items-center md:justify-between md:p-6">
+        {/* Recent projects */}
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white">
+          <div className="flex items-center justify-between border-b border-[#eee5d4] px-5 py-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
                 Recent Websites
               </p>
-
-              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+              <p className="mt-0.5 text-sm font-bold text-slate-950">
                 Continue audit work
-              </CardTitle>
+              </p>
             </div>
+            <Link
+              href="/dashboard/projects"
+              className="text-xs font-semibold text-[#7a5b00] hover:underline"
+            >
+              View all →
+            </Link>
+          </div>
 
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/projects">View SEO Audit</Link>
-            </Button>
-          </CardHeader>
-
-          <CardContent className="p-0">
-            {recentWebsites.length === 0 ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center p-8 text-center">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-                  No projects yet
-                </p>
-
-                <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-                  Add your first client website.
-                </h2>
-
-                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500">
-                  After adding a project, you can run audits, review keyword
-                  data, and export client-ready reports.
-                </p>
-
-                <Button asChild className="mt-6">
-                  <Link href="/dashboard/projects/new">Add Project</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="divide-y divide-[#eee5d4]">
-                {recentWebsites.map((item) => {
-                  const project = item.project;
-                  const score = item.latestAudit?.score ?? null;
-
-                  return (
-                    <div
-                      key={project.id}
-                      className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center md:p-6"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${getScoreClass(
-                              score
-                            )}`}
-                          >
-                            {getScoreLabel(score)}
-                          </span>
-
-                          <span className="rounded-full border border-[#e6dcc8] bg-[#faf7ef] px-3 py-1 text-xs font-medium text-slate-600">
-                            Last scan {formatDate(item.latestAudit?.created_at)}
-                          </span>
-                        </div>
-
-                        <h3 className="mt-3 truncate text-lg font-bold text-slate-950">
-                          {project.name}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          {normalizeDomain(project.domain)}
-                        </p>
+          {recentItems.length === 0 ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center p-8 text-center">
+              <p className="text-sm font-semibold text-slate-950">
+                No projects yet
+              </p>
+              <p className="mt-2 max-w-xs text-xs leading-5 text-slate-500">
+                Add a client website to start running audits, reviewing
+                keywords, and exporting reports.
+              </p>
+              <Link
+                href="/dashboard/projects/new"
+                className="mt-4 inline-flex h-8 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
+              >
+                Add Project
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#eee5d4]">
+              {recentItems.map((item) => {
+                const score = item.latestAudit?.score ?? null;
+                return (
+                  <div
+                    key={item.project.id}
+                    className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getScoreBadgeClass(score)}`}
+                        >
+                          {getScoreLabel(score)}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          Last scan {formatDate(item.latestAudit?.created_at)}
+                        </span>
                       </div>
-
-                      <div className="flex flex-wrap gap-2 md:justify-end">
-                        <Button asChild size="sm">
-                          <Link href={`/dashboard/projects/${project.id}`}>
-                            Overview
-                          </Link>
-                        </Button>
-
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/dashboard/projects/${project.id}/audit`}>
-                            Run Audit
-                          </Link>
-                        </Button>
-                      </div>
+                      <p className="mt-1.5 truncate text-sm font-bold text-slate-950">
+                        {item.project.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {normalizeDomain(item.project.domain)}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    <div className="flex shrink-0 gap-2">
+                      <Link
+                        href={`/dashboard/projects/${item.project.id}`}
+                        className="inline-flex h-8 items-center rounded-xl bg-[#111111] px-3 text-xs font-semibold text-white hover:bg-black"
+                      >
+                        Overview
+                      </Link>
+                      <Link
+                        href={`/dashboard/projects/${item.project.id}/audit`}
+                        className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+                      >
+                        Run Audit
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-        <Card className="rounded-3xl border-[#e6dcc8] bg-[#111111] text-white shadow-sm">
-          <CardHeader className="border-b border-white/10 p-5 md:p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+        {/* Workflow guide */}
+        <div className="rounded-2xl border border-[#2b2413] bg-[#111111] text-white">
+          <div className="border-b border-white/10 px-5 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
               Workflow
             </p>
-
-            <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+            <p className="mt-0.5 text-sm font-bold text-white">
               How to use RankCraft Audit
-            </CardTitle>
-          </CardHeader>
+            </p>
+          </div>
+          <div className="space-y-2 p-4">
+            {[
+              {
+                step: "01",
+                title: "Add Project",
+                desc: "Add the client website from the Dashboard.",
+              },
+              {
+                step: "02",
+                title: "Open SEO Audit",
+                desc: "Choose the website and open the audit workspace.",
+              },
+              {
+                step: "03",
+                title: "Run, review, report",
+                desc: "Run audits, review keywords, export reports, follow recommendations.",
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="rounded-xl border border-white/10 bg-white/5 p-3"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/10 text-[10px] font-bold text-[#f5d56a]">
+                    {item.step}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-white">
+                      {item.title}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-          <CardContent className="space-y-4 p-5 md:p-6">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-semibold text-white">1. Add Project</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Add the client website from the Dashboard.
-              </p>
+            <div className="mt-2 space-y-2 pt-1">
+              <Link
+                href="/dashboard/projects/new"
+                className="flex h-9 items-center justify-center rounded-xl bg-[#d4af37] text-xs font-semibold text-black transition hover:bg-[#c9a42e]"
+              >
+                Add Project
+              </Link>
+              <Link
+                href="/dashboard/projects"
+                className="flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs font-semibold text-white transition hover:bg-white/10"
+              >
+                Open SEO Audit
+              </Link>
             </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-semibold text-white">
-                2. Open SEO Audit
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Open the audit workflow and choose the website you want to work
-                on.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-semibold text-white">
-                3. Run, review, report
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Run audits, review keywords, export reports, and follow the
-                recommendations.
-              </p>
-            </div>
-
-            <Button asChild className="w-full">
-              <Link href="/dashboard/projects/new">Add Project</Link>
-            </Button>
-
-            <Button asChild variant="outline" className="w-full bg-transparent">
-              <Link href="/dashboard/projects">Open SEO Audit</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

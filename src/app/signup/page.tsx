@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "Sign Up",
+  description:
+    "Create your RankCraft Audit account to manage projects, run SEO audits, and prepare client-ready reports.",
+};
 
 type SignupPageProps = {
   searchParams?: Promise<{

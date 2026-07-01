@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "SEO Audits & Client Reports",
+  description:
+    "RankCraft Audit helps SEO specialists run website audits, review keyword visibility, and prepare clear client reports without bloated tools.",
+};
 
 async function signOut() {
   "use server";

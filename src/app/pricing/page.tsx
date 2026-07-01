@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description:
+    "Compare RankCraft Audit plans for SEO audits, PageSpeed scores, keyword tracking, and client-ready reports.",
+};
 
 type Plan = {
   name: string;
