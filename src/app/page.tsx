@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "SEO Audits & Client Reports",
@@ -88,9 +87,12 @@ export default async function HomePage() {
                   Login
                 </Link>
 
-                <Button asChild>
-                  <Link href="/signup">Sign up</Link>
-                </Button>
+                <Link
+                  href="/signup"
+                  className="inline-flex h-9 items-center justify-center rounded-2xl bg-[#d4af37] px-4 text-sm font-semibold text-black transition hover:bg-[#c9a42e]"
+                >
+                  Sign up
+                </Link>
               </>
             )}
           </div>
@@ -152,20 +154,19 @@ export default async function HomePage() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href={user ? "/dashboard" : "/signup"}>
-                  {user ? "View Dashboard" : "Get Started"}
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              <Link
+                href={user ? "/dashboard" : "/signup"}
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#d4af37] px-6 text-sm font-semibold text-black transition hover:bg-[#c9a42e]"
               >
-                <Link href="/pricing">See Pricing</Link>
-              </Button>
+                {user ? "View Dashboard" : "Get Started"}
+              </Link>
+
+              <Link
+                href="/pricing"
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                See Pricing
+              </Link>
             </div>
           </div>
         </div>
@@ -221,19 +222,19 @@ export default async function HomePage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href={user ? "/dashboard/projects/new" : "/signup"}>
-                  {user ? "Add Project" : "Create Account"}
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              <Link
+                href={user ? "/dashboard/projects/new" : "/signup"}
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-[#d4af37] px-5 text-sm font-semibold text-black transition hover:bg-[#c9a42e]"
               >
-                <Link href="/pricing">View Plans</Link>
-              </Button>
+                {user ? "Add Project" : "Create Account"}
+              </Link>
+
+              <Link
+                href="/pricing"
+                className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                View Plans
+              </Link>
             </div>
           </div>
         </div>

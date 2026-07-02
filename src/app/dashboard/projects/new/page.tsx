@@ -1,13 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 type Plan = "free" | "starter" | "growth" | "agency";
 
@@ -28,73 +21,45 @@ type Subscription = {
 
 function normalizeDomain(input: string) {
   const trimmed = input.trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
+  if (!trimmed) return "";
   const withoutTrailingSlash = trimmed.replace(/\/$/, "");
-
   if (
     withoutTrailingSlash.startsWith("http://") ||
     withoutTrailingSlash.startsWith("https://")
   ) {
     return withoutTrailingSlash;
   }
-
   return `https://${withoutTrailingSlash}`;
 }
 
 function normalizeDomainForDisplay(domain: string) {
-  return domain
-    .replace("https://", "")
-    .replace("http://", "")
-    .replace(/\/$/, "");
+  return domain.replace("https://", "").replace("http://", "").replace(/\/$/, "");
 }
 
 function formatPlanName(plan: string | null | undefined) {
-  if (!plan) {
-    return "Free";
-  }
-
+  if (!plan) return "Free";
   return plan.slice(0, 1).toUpperCase() + plan.slice(1);
 }
 
 function getProjectLimit(plan: string | null | undefined) {
-  if (plan === "agency") {
-    return null;
-  }
-
-  if (plan === "growth") {
-    return 10;
-  }
-
+  if (plan === "agency") return null;
+  if (plan === "growth") return 10;
   return 1;
 }
 
 function getLimitText(plan: string | null | undefined) {
   const limit = getProjectLimit(plan);
-
-  if (limit === null) {
-    return "Unlimited projects";
-  }
-
+  if (limit === null) return "Unlimited projects";
   return `${limit} project${limit === 1 ? "" : "s"}`;
 }
 
 function getPlanUpgradeMessage(plan: string | null | undefined) {
-  if (plan === "free") {
+  if (plan === "free")
     return "Your Free plan includes 1 project. Request Starter, Growth, or Agency to add more projects.";
-  }
-
-  if (plan === "starter") {
+  if (plan === "starter")
     return "Your Starter plan includes 1 project. Request Growth or Agency to add more projects.";
-  }
-
-  if (plan === "growth") {
+  if (plan === "growth")
     return "Your Growth plan includes 10 projects. Request Agency for unlimited projects.";
-  }
-
   return "Your current plan limit has been reached.";
 }
 
@@ -115,9 +80,7 @@ async function createProject(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: subscriptionData } = await supabase
     .from("subscriptions")
@@ -128,7 +91,7 @@ async function createProject(formData: FormData) {
   let subscription = subscriptionData as Subscription | null;
 
   if (!subscription) {
-    const { data: createdSubscription } = await supabase
+    const { data: created } = await supabase
       .from("subscriptions")
       .insert({
         user_id: user.id,
@@ -139,7 +102,7 @@ async function createProject(formData: FormData) {
       .select("id, user_id, plan, status, billing_mode")
       .single();
 
-    subscription = createdSubscription as Subscription | null;
+    subscription = created as Subscription | null;
   }
 
   const currentPlan = subscription?.plan || "free";
@@ -147,27 +110,18 @@ async function createProject(formData: FormData) {
 
   const { count: projectCount } = await supabase
     .from("projects")
-    .select("id", {
-      count: "exact",
-      head: true,
-    })
+    .select("id", { count: "exact", head: true })
     .eq("user_id", user.id);
 
   const currentProjectCount = projectCount || 0;
 
   if (projectLimit !== null && currentProjectCount >= projectLimit) {
-    redirect(
-      `/dashboard/projects/new?error=project-limit&plan=${currentPlan}`
-    );
+    redirect(`/dashboard/projects/new?error=project-limit&plan=${currentPlan}`);
   }
 
   const { data: project, error } = await supabase
     .from("projects")
-    .insert({
-      name,
-      domain,
-      user_id: user.id,
-    })
+    .insert({ name, domain, user_id: user.id })
     .select("id")
     .single();
 
@@ -178,9 +132,7 @@ async function createProject(formData: FormData) {
   redirect(`/dashboard/projects/${project.id}`);
 }
 
-export default async function NewProjectPage({
-  searchParams,
-}: NewProjectPageProps) {
+export default async function NewProjectPage({ searchParams }: NewProjectPageProps) {
   const resolvedSearchParams = await searchParams;
   const error = resolvedSearchParams?.error;
 
@@ -190,9 +142,7 @@ export default async function NewProjectPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: subscriptionData } = await supabase
     .from("subscriptions")
@@ -203,7 +153,7 @@ export default async function NewProjectPage({
   let subscription = subscriptionData as Subscription | null;
 
   if (!subscription) {
-    const { data: createdSubscription } = await supabase
+    const { data: created } = await supabase
       .from("subscriptions")
       .insert({
         user_id: user.id,
@@ -214,7 +164,7 @@ export default async function NewProjectPage({
       .select("id, user_id, plan, status, billing_mode")
       .single();
 
-    subscription = createdSubscription as Subscription | null;
+    subscription = created as Subscription | null;
   }
 
   const currentPlan = subscription?.plan || "free";
@@ -222,15 +172,11 @@ export default async function NewProjectPage({
 
   const { count: projectCount } = await supabase
     .from("projects")
-    .select("id", {
-      count: "exact",
-      head: true,
-    })
+    .select("id", { count: "exact", head: true })
     .eq("user_id", user.id);
 
   const currentProjectCount = projectCount || 0;
-  const hasReachedLimit =
-    projectLimit !== null && currentProjectCount >= projectLimit;
+  const hasReachedLimit = projectLimit !== null && currentProjectCount >= projectLimit;
 
   const errorMessage =
     error === "missing-fields"
@@ -242,326 +188,274 @@ export default async function NewProjectPage({
           : null;
 
   const exampleProjects = [
-    {
-      name: "RankCraft Web",
-      domain: "rankcraftweb.com",
-    },
-    {
-      name: "Client Roofing Website",
-      domain: "clientroofing.com",
-    },
-    {
-      name: "Local Service Business",
-      domain: "localservicebusiness.com",
-    },
+    { name: "RankCraft Web", domain: "rankcraftweb.com" },
+    { name: "Client Roofing Website", domain: "clientroofing.com" },
+    { name: "Local Service Business", domain: "localservicebusiness.com" },
   ];
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-[#e6dcc8] bg-white p-6 shadow-sm md:p-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-3xl">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard">← Back to Dashboard</Link>
-            </Button>
+    <div className="space-y-5">
 
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
-              Add Project
-            </p>
-
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-              Create a new audit project
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Add the client website name and URL. After creating the project,
-              you will go straight to the overview where you can run the audit,
-              review keywords, open the report, and check recommendations.
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
-            <Button asChild variant="outline">
-              <Link href="/dashboard/projects">SEO Audit</Link>
-            </Button>
-
-            <Button asChild variant="outline">
-              <Link href="/dashboard/billing">Billing</Link>
-            </Button>
-          </div>
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <Link
+            href="/dashboard"
+            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+          >
+            ← Dashboard
+          </Link>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            Add a new project
+          </h1>
+          <p className="max-w-xl text-xs leading-5 text-slate-500">
+            Add the client website name and URL, then run the first audit.
+          </p>
         </div>
-      </section>
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/projects"
+            className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+          >
+            SEO Audit
+          </Link>
+          <Link
+            href="/dashboard/billing"
+            className="inline-flex h-8 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+          >
+            Billing
+          </Link>
+        </div>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Current Plan
-            </CardTitle>
-          </CardHeader>
+      {/* Plan usage stats */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Current Plan
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            {formatPlanName(currentPlan)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Active account plan</p>
+        </div>
 
-          <CardContent>
-            <p className="text-3xl font-bold tracking-tight text-slate-950">
-              {formatPlanName(currentPlan)}
-            </p>
+        <div className="rounded-2xl border border-[#d4af37]/40 bg-[#fff8df] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
+            Project Usage
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            {currentProjectCount}
+            <span className="text-sm font-semibold text-[#7a5b00]/70">
+              {" "}/ {projectLimit === null ? "∞" : projectLimit}
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-[#7a5b00]/70">{getLimitText(currentPlan)} allowed</p>
+        </div>
 
-            <p className="mt-2 text-sm text-slate-500">
-              Active account plan.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-[#d4af37]/50 bg-[#fff8df] shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
-              Project Usage
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-bold tracking-tight text-slate-950">
-              {currentProjectCount}
-              <span className="text-base font-semibold text-[#7a5b00]/70">
-                {" "}
-                / {projectLimit === null ? "∞" : projectLimit}
-              </span>
-            </p>
-
-            <p className="mt-2 text-sm text-[#7a5b00]/80">
-              {getLimitText(currentPlan)} allowed.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Limit Status
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-bold tracking-tight text-slate-950">
-              {hasReachedLimit ? "Limit Reached" : "Available"}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">
-              {hasReachedLimit
-                ? "Upgrade needed to add more projects."
-                : "You can create another project."}
-            </p>
-          </CardContent>
-        </Card>
-      </section>
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Limit Status
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            {hasReachedLimit ? "Reached" : "Available"}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {hasReachedLimit ? "Upgrade needed" : "You can create another"}
+          </p>
+        </div>
+      </div>
 
       {errorMessage ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700">
           {errorMessage}
         </div>
       ) : null}
 
       {hasReachedLimit ? (
-        <section className="rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5 shadow-sm md:p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="rounded-2xl border border-[#d4af37]/40 bg-[#fff8df] px-5 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a5b00]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7a5b00]">
                 Plan Limit
               </p>
-
-              <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+              <p className="mt-1 text-sm font-bold text-slate-950">
                 You reached your project limit.
-              </h2>
-
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#7a5b00]/80">
+              </p>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-[#7a5b00]/80">
                 {getPlanUpgradeMessage(currentPlan)}
               </p>
             </div>
-
-            <Button asChild>
-              <Link href="/dashboard/billing">Request Upgrade</Link>
-            </Button>
+            <Link
+              href="/dashboard/billing"
+              className="inline-flex h-8 shrink-0 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white hover:bg-black"
+            >
+              Request Upgrade
+            </Link>
           </div>
-        </section>
+        </div>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-          <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
+      {/* Main grid */}
+      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+
+        {/* Form */}
+        <div className="rounded-2xl border border-[#e6dcc8] bg-white">
+          <div className="border-b border-[#eee5d4] px-5 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
               Project Details
             </p>
-
-            <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+            <p className="mt-0.5 text-sm font-bold text-slate-950">
               Website information
-            </CardTitle>
-
-            <p className="text-sm leading-6 text-slate-500">
-              Use a clear project name and the website URL you want to audit.
             </p>
-          </CardHeader>
+          </div>
 
-          <CardContent className="p-5 md:p-6">
-            <form action={createProject} className="space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="name"
-                  className="text-sm font-semibold text-slate-950"
-                >
-                  Project Name
-                </label>
+          <form action={createProject} className="space-y-4 p-5">
+            <div className="space-y-1.5">
+              <label htmlFor="name" className="text-xs font-semibold text-slate-950">
+                Project Name
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="Example: RankCraft Web"
+                disabled={hasReachedLimit}
+                required
+                className="h-10 w-full rounded-xl border border-[#e6dcc8] bg-white px-3.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              />
+              <p className="text-[11px] text-slate-500">
+                Use the client name, brand name, or website name.
+              </p>
+            </div>
 
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="Example: RankCraft Web"
-                  disabled={hasReachedLimit}
-                  className="h-12 w-full rounded-2xl border border-[#e6dcc8] bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  required
-                />
+            <div className="space-y-1.5">
+              <label htmlFor="domain" className="text-xs font-semibold text-slate-950">
+                Website URL
+              </label>
+              <input
+                id="domain"
+                name="domain"
+                type="text"
+                placeholder="example.com"
+                disabled={hasReachedLimit}
+                required
+                className="h-10 w-full rounded-xl border border-[#e6dcc8] bg-white px-3.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              />
+              <p className="text-[11px] text-slate-500">
+                You can enter example.com or https://example.com.
+              </p>
+            </div>
 
-                <p className="text-xs leading-5 text-slate-500">
-                  Use the client name, brand name, or website name.
-                </p>
-              </div>
+            <div className="rounded-xl border border-[#d4af37]/40 bg-[#fff8df] p-3.5">
+              <p className="text-xs font-semibold text-[#7a5b00]">
+                Next step after creating
+              </p>
+              <p className="mt-1 text-[11px] leading-4 text-[#7a5b00]/80">
+                You will be redirected to the Overview page to run the first
+                audit, sync keyword data, and open the report.
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="domain"
-                  className="text-sm font-semibold text-slate-950"
-                >
-                  Website URL
-                </label>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={hasReachedLimit}
+                className="inline-flex h-9 items-center rounded-xl bg-[#111111] px-4 text-xs font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {hasReachedLimit ? "Project Limit Reached" : "Create Project"}
+              </button>
+              <Link
+                href="/dashboard"
+                className="inline-flex h-9 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-[#faf7ef]"
+              >
+                Cancel
+              </Link>
+            </div>
+          </form>
+        </div>
 
-                <input
-                  id="domain"
-                  name="domain"
-                  type="text"
-                  placeholder="example.com"
-                  disabled={hasReachedLimit}
-                  className="h-12 w-full rounded-2xl border border-[#e6dcc8] bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#d4af37] focus:ring-4 focus:ring-[#d4af37]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  required
-                />
+        {/* Sidebar */}
+        <div className="space-y-3">
 
-                <p className="text-xs leading-5 text-slate-500">
-                  You can enter example.com or https://example.com.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-[#d4af37]/50 bg-[#fff8df] p-4">
-                <p className="text-sm font-semibold text-[#7a5b00]">
-                  Next step after creating
-                </p>
-
-                <p className="mt-2 text-sm leading-6 text-[#7a5b00]/80">
-                  You will be redirected to the Overview page. From there, run
-                  the first audit, sync keyword data, open the report, and
-                  review recommendations.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Button type="submit" disabled={hasReachedLimit}>
-                  {hasReachedLimit ? "Project Limit Reached" : "Create Project"}
-                </Button>
-
-                <Button asChild type="button" variant="outline">
-                  <Link href="/dashboard">Cancel</Link>
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
-            <CardHeader className="border-b border-white/10 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b6a46a]">
+          <div className="rounded-2xl border border-[#2b2413] bg-[#111111] text-white">
+            <div className="border-b border-white/10 px-5 py-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#b6a46a]">
                 Workflow
               </p>
-
-              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+              <p className="mt-0.5 text-sm font-bold text-white">
                 What happens next
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-3 p-5">
+              </p>
+            </div>
+            <div className="space-y-2 p-4">
               {[
                 {
                   step: "01",
                   title: "Create project",
-                  description:
-                    "Add the website name and URL to start the audit workspace.",
+                  desc: "Add the website name and URL to start the workspace.",
                 },
                 {
                   step: "02",
                   title: "Run audit",
-                  description:
-                    "Scan metadata, headings, canonical tags, mobile setup, and technical issues.",
+                  desc: "Scan metadata, headings, canonical tags, and technical issues.",
                 },
                 {
                   step: "03",
                   title: "Review keywords",
-                  description:
-                    "Use GSC data to find ranking, CTR, and visibility opportunities.",
+                  desc: "Use GSC data to find ranking and visibility opportunities.",
                 },
                 {
                   step: "04",
                   title: "Export report",
-                  description:
-                    "Open a compact client-ready report with issues and action steps.",
+                  desc: "Open a compact client-ready report with action steps.",
                 },
               ].map((item) => (
                 <div
                   key={item.step}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-xl border border-white/10 bg-white/5 p-3"
                 >
-                  <div className="flex gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-xs font-bold text-[#f5d56a]">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/10 text-[10px] font-bold text-[#f5d56a]">
                       {item.step}
-                    </div>
-
+                    </span>
                     <div>
-                      <p className="text-sm font-semibold text-white">
+                      <p className="text-xs font-semibold text-white">
                         {item.title}
                       </p>
-
-                      <p className="mt-1 text-sm leading-5 text-slate-400">
-                        {item.description}
+                      <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
+                        {item.desc}
                       </p>
                     </div>
                   </div>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="rounded-3xl border-[#e6dcc8] bg-[#faf7ef] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg text-slate-950">
+          <div className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef]">
+            <div className="border-b border-[#eee5d4] px-5 py-3.5">
+              <p className="text-sm font-bold text-slate-950">
                 Example project names
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-3">
+              </p>
+            </div>
+            <div className="space-y-2 p-4">
               {exampleProjects.map((project) => (
                 <div
                   key={project.domain}
-                  className="rounded-2xl border border-[#e6dcc8] bg-white p-4"
+                  className="rounded-xl border border-[#e6dcc8] bg-white p-3"
                 >
-                  <p className="font-semibold text-slate-950">
+                  <p className="text-xs font-semibold text-slate-950">
                     {project.name}
                   </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-0.5 text-[11px] text-slate-500">
                     {normalizeDomainForDisplay(project.domain)}
                   </p>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

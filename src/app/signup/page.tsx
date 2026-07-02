@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Sign Up",
@@ -193,9 +192,12 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
                 />
               </div>
 
-              <Button type="submit" className="h-12 w-full">
+              <button
+                type="submit"
+                className="h-12 w-full rounded-2xl bg-[#d4af37] text-sm font-semibold text-black transition hover:bg-[#c9a42e]"
+              >
                 Create account
-              </Button>
+              </button>
             </form>
 
             <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">

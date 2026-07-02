@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -39,9 +32,7 @@ Please send me the next steps for billing and activation.
 
 Thank you.`;
 
-  return `mailto:rankcraftweb@gmail.com?subject=${encodeURIComponent(
-    subject
-  )}&body=${encodeURIComponent(body)}`;
+  return `mailto:rankcraftweb@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 export default async function PricingPage() {
@@ -94,12 +85,41 @@ export default async function PricingPage() {
     },
   ];
 
+  const includedItems = [
+    {
+      title: "SEO audit runner",
+      description:
+        "Run checks for metadata, headings, canonical tags, mobile setup, and technical SEO issues.",
+    },
+    {
+      title: "PageSpeed scores",
+      description:
+        "Store performance, accessibility, best practices, and SEO scores from PageSpeed scans.",
+    },
+    {
+      title: "Keyword tracking",
+      description:
+        "Use Google Search Console data to review clicks, impressions, CTR, and average position.",
+    },
+    {
+      title: "Client reports",
+      description:
+        "Export compact reports with scores, issues, keyword opportunities, and action steps.",
+    },
+  ];
+
+  const paymentNotes = [
+    "Manual billing keeps the MVP launch-ready while payment verification is pending.",
+    "Plan requests are handled directly through RankCraft Web.",
+    "PayMongo checkout can be connected after online payments are fully enabled.",
+  ];
+
   return (
     <main className="min-h-screen bg-[#f7f3ea] text-slate-950">
       <header className="border-b border-[#e6dcc8] bg-[#f7f3ea]/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 md:px-6">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#d4af37]/50 bg-[#111111] text-sm font-bold text-[#f5d56a]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d4af37]/50 bg-[#111111] text-xs font-bold text-[#f5d56a]">
               RC
             </div>
 
@@ -126,18 +146,27 @@ export default async function PricingPage() {
 
           <div className="flex items-center gap-2">
             {user ? (
-              <Button asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </Button>
+              <Link
+                href="/dashboard"
+                className="inline-flex h-9 items-center rounded-xl bg-[#111111] px-4 text-sm font-semibold text-white transition hover:bg-black"
+              >
+                Dashboard
+              </Link>
             ) : (
               <>
-                <Button asChild variant="outline">
-                  <Link href="/login">Login</Link>
-                </Button>
+                <Link
+                  href="/login"
+                  className="inline-flex h-9 items-center rounded-xl border border-[#e6dcc8] bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-[#faf7ef]"
+                >
+                  Login
+                </Link>
 
-                <Button asChild>
-                  <Link href="/signup">Sign up</Link>
-                </Button>
+                <Link
+                  href="/signup"
+                  className="inline-flex h-9 items-center rounded-xl bg-[#111111] px-4 text-sm font-semibold text-white transition hover:bg-black"
+                >
+                  Sign up
+                </Link>
               </>
             )}
           </div>
@@ -165,19 +194,19 @@ export default async function PricingPage() {
               </p>
 
               <div className="mt-7 flex flex-wrap justify-center gap-3">
-                <Button asChild>
-                  <Link href={user ? "/dashboard" : "/signup"}>
-                    {user ? "Open Dashboard" : "Create Account"}
-                  </Link>
-                </Button>
-
-                <Button
-                  asChild
-                  variant="outline"
-                  className="bg-transparent text-white hover:bg-white/10"
+                <Link
+                  href={user ? "/dashboard" : "/signup"}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#d4af37] px-6 text-sm font-semibold text-black transition hover:bg-[#c9a42e]"
                 >
-                  <Link href="/">Back to Home</Link>
-                </Button>
+                  {user ? "Open Dashboard" : "Create Account"}
+                </Link>
+
+                <Link
+                  href="/"
+                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/20 bg-transparent px-6 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  Back to Home
+                </Link>
               </div>
             </div>
           </div>
@@ -201,12 +230,12 @@ export default async function PricingPage() {
 
         <section className="mt-6 grid gap-5 lg:grid-cols-3">
           {plans.map((plan) => (
-            <Card
+            <div
               key={plan.name}
-              className={`relative rounded-3xl bg-white shadow-sm ${
+              className={`relative rounded-3xl bg-white p-5 shadow-sm md:p-6 ${
                 plan.badge
-                  ? "border-[#d4af37]/70 ring-4 ring-[#d4af37]/10"
-                  : "border-[#e6dcc8]"
+                  ? "border-2 border-[#d4af37]/60"
+                  : "border border-[#e6dcc8]"
               }`}
             >
               {plan.badge ? (
@@ -215,29 +244,19 @@ export default async function PricingPage() {
                 </div>
               ) : null}
 
-              <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
-                <CardTitle className="text-xl font-bold text-slate-950">
-                  {plan.name}
-                </CardTitle>
-
-                <p className="max-w-sm text-sm leading-6 text-slate-500">
+              <div className={plan.badge ? "pt-8" : ""}>
+                <p className="text-xl font-bold text-slate-950">{plan.name}</p>
+                <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
                   {plan.description}
                 </p>
-              </CardHeader>
+              </div>
 
-              <CardContent className="flex min-h-[430px] flex-col p-5 md:p-6">
-                <div
-                  className={
-                    plan.badge
-                      ? "rounded-3xl border border-[#d4af37]/50 bg-[#fff8df] p-5"
-                      : "rounded-3xl border border-[#e6dcc8] bg-[#faf7ef] p-5"
-                  }
-                >
+              <div className="mt-5 flex min-h-[380px] flex-col">
+                <div className="rounded-3xl border border-[#e6dcc8] bg-[#faf7ef] p-5">
                   <div className="flex items-end gap-2">
                     <p className="text-5xl font-bold tracking-tight text-slate-950">
                       {plan.price}
                     </p>
-
                     <p className="pb-2 text-sm text-slate-500">
                       {plan.period}
                     </p>
@@ -263,56 +282,36 @@ export default async function PricingPage() {
                 </div>
 
                 <div className="mt-auto pt-8">
-                  <Button asChild className="w-full">
-                    <Link href={buildPlanRequestLink(plan.name, user?.email)}>
-                      {plan.cta}
-                    </Link>
-                  </Button>
+                  <Link
+                    href={buildPlanRequestLink(plan.name, user?.email)}
+                    className="flex h-10 w-full items-center justify-center rounded-2xl bg-[#111111] text-sm font-semibold text-white transition hover:bg-black"
+                  >
+                    {plan.cta}
+                  </Link>
 
                   <p className="mt-3 text-center text-xs text-slate-500">
                     This sends a manual plan request to RankCraft Web.
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </section>
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_380px]">
-          <Card className="rounded-3xl border-[#e6dcc8] bg-white shadow-sm">
-            <CardHeader className="border-b border-[#eee5d4] p-5 md:p-6">
+          <div className="rounded-3xl border border-[#e6dcc8] bg-white shadow-sm">
+            <div className="border-b border-[#eee5d4] p-5 md:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7a19]">
                 Included
               </p>
 
-              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+              <p className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                 Built for SEO audit delivery
-              </CardTitle>
-            </CardHeader>
+              </p>
+            </div>
 
-            <CardContent className="grid gap-3 p-5 md:grid-cols-2 md:p-6">
-              {[
-                {
-                  title: "SEO audit runner",
-                  description:
-                    "Run checks for metadata, headings, canonical tags, mobile setup, and technical SEO issues.",
-                },
-                {
-                  title: "PageSpeed scores",
-                  description:
-                    "Store performance, accessibility, best practices, and SEO scores from PageSpeed scans.",
-                },
-                {
-                  title: "Keyword tracking",
-                  description:
-                    "Use Google Search Console data to review clicks, impressions, CTR, and average position.",
-                },
-                {
-                  title: "Client reports",
-                  description:
-                    "Export compact reports with scores, issues, keyword opportunities, and action steps.",
-                },
-              ].map((item) => (
+            <div className="grid gap-3 p-5 md:grid-cols-2 md:p-6">
+              {includedItems.map((item) => (
                 <div
                   key={item.title}
                   className="rounded-2xl border border-[#e6dcc8] bg-[#faf7ef] p-4"
@@ -324,26 +323,22 @@ export default async function PricingPage() {
                   </p>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="rounded-3xl border-[#2b2413] bg-[#111111] text-white shadow-sm">
-            <CardHeader className="border-b border-white/10 p-5 md:p-6">
+          <div className="rounded-3xl border border-[#2b2413] bg-[#111111] text-white shadow-sm">
+            <div className="border-b border-white/10 p-5 md:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
                 Payment Setup
               </p>
 
-              <CardTitle className="mt-2 text-xl font-bold tracking-tight text-white">
+              <p className="mt-2 text-xl font-bold tracking-tight text-white">
                 Online checkout is coming later.
-              </CardTitle>
-            </CardHeader>
+              </p>
+            </div>
 
-            <CardContent className="space-y-4 p-5 md:p-6">
-              {[
-                "Manual billing keeps the MVP launch-ready while payment verification is pending.",
-                "Plan requests are handled directly through RankCraft Web.",
-                "PayMongo checkout can be connected after online payments are fully enabled.",
-              ].map((item) => (
+            <div className="space-y-4 p-5 md:p-6">
+              {paymentNotes.map((item) => (
                 <div
                   key={item}
                   className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300"
@@ -352,17 +347,21 @@ export default async function PricingPage() {
                 </div>
               ))}
 
-              <Button asChild className="w-full">
-                <Link href={user ? "/dashboard" : "/signup"}>
-                  {user ? "Open Dashboard" : "Create Account"}
-                </Link>
-              </Button>
+              <Link
+                href={user ? "/dashboard" : "/signup"}
+                className="flex h-10 w-full items-center justify-center rounded-2xl bg-[#d4af37] text-sm font-semibold text-black transition hover:bg-[#c9a42e]"
+              >
+                {user ? "Open Dashboard" : "Create Account"}
+              </Link>
 
-              <Button asChild variant="outline" className="w-full bg-transparent">
-                <Link href="/">Back to Home</Link>
-              </Button>
-            </CardContent>
-          </Card>
+              <Link
+                href="/"
+                className="flex h-10 w-full items-center justify-center rounded-2xl border border-white/10 bg-transparent text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                Back to Home
+              </Link>
+            </div>
+          </div>
         </section>
       </section>
     </main>
