@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+type Plan = "free" | "starter" | "growth" | "agency";
+
+type Subscription = {
+  id: string;
+  user_id: string;
+  plan: Plan;
+  status: string;
+  billing_mode: string;
+};
+
 type GscConnection = {
   id: string;
   user_id?: string | null;
@@ -58,12 +68,28 @@ function isTokenExpired(expiresAt?: string | null) {
   return expiryTime <= Date.now() + 60_000;
 }
 
+function getKeywordLimit(plan: Plan | string | null | undefined) {
+  if (plan === "agency") {
+    return 500;
+  }
+
+  if (plan === "growth") {
+    return 100;
+  }
+
+  return 10;
+}
+
 async function refreshAccessToken(refreshToken: string) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId =
+    process.env.GOOGLE_GSC_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const clientSecret =
+    process.env.GOOGLE_GSC_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET.");
+    throw new Error(
+      "Missing GOOGLE_GSC_CLIENT_ID or GOOGLE_GSC_CLIENT_SECRET."
+    );
   }
 
   const response = await fetch("https://oauth2.googleapis.com/token", {
@@ -94,7 +120,10 @@ async function refreshAccessToken(refreshToken: string) {
   };
 }
 
-async function findGscConnection(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+async function findGscConnection(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
   const tables = ["gsc_connections", "google_connections", "google_accounts"];
 
   for (const table of tables) {
@@ -114,6 +143,38 @@ async function findGscConnection(supabase: Awaited<ReturnType<typeof createClien
   }
 
   return null;
+}
+
+async function getOrCreateSubscription(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  const { data: subscriptionData } = await supabase
+    .from("subscriptions")
+    .select("id, user_id, plan, status, billing_mode")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (subscriptionData) {
+    return subscriptionData as Subscription;
+  }
+
+  const { data: createdSubscription, error } = await supabase
+    .from("subscriptions")
+    .insert({
+      user_id: userId,
+      plan: "free",
+      status: "active",
+      billing_mode: "manual",
+    })
+    .select("id, user_id, plan, status, billing_mode")
+    .single();
+
+  if (error || !createdSubscription) {
+    throw new Error("Could not create subscription record.");
+  }
+
+  return createdSubscription as Subscription;
 }
 
 function getSiteUrl(connection: GscConnection, projectDomain: string) {
@@ -142,7 +203,8 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const projectId = body.projectId as string | undefined;
-    const startDate = (body.startDate as string | undefined) || getDateString(28);
+    const startDate =
+      (body.startDate as string | undefined) || getDateString(28);
     const endDate = (body.endDate as string | undefined) || getDateString(1);
 
     if (!projectId) {
@@ -178,6 +240,10 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
+
+    const subscription = await getOrCreateSubscription(supabase, user.id);
+    const currentPlan = subscription.plan || "free";
+    const keywordLimit = getKeywordLimit(currentPlan);
 
     const foundConnection = await findGscConnection(supabase, user.id);
 
@@ -235,7 +301,7 @@ export async function POST(request: Request) {
           startDate,
           endDate,
           dimensions: ["query"],
-          rowLimit: 100,
+          rowLimit: keywordLimit,
           startRow: 0,
         }),
         cache: "no-store",
@@ -255,7 +321,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const rows = gscData.rows || [];
+    const rows = (gscData.rows || []).slice(0, keywordLimit);
 
     const keywordRows = rows.map((row) => {
       const clicks = Math.round(row.clicks || 0);
@@ -298,10 +364,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       synced: keywordRows.length,
+      limit: keywordLimit,
+      plan: currentPlan,
       startDate,
       endDate,
       siteUrl,
-      message: "GSC keyword data synced successfully.",
+      message: `Synced ${keywordRows.length} of ${keywordLimit} allowed keyword rows for the ${currentPlan} plan.`,
     });
   } catch (error) {
     return NextResponse.json(
